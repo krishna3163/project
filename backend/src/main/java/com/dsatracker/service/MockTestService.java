@@ -185,7 +185,11 @@ public class MockTestService {
         if (session == null) {
             session = inMemorySessions.remove(sessionKey);
         } else {
-            redisTemplate.delete(sessionKey);
+            try {
+                redisTemplate.delete(sessionKey);
+            } catch (Exception e) {
+                log.warn("Failed to delete active session from Redis: {}", e.getMessage());
+            }
         }
 
         // Fallback values if session was lost/expired

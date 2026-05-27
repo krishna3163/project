@@ -101,7 +101,7 @@ public class AuthService {
         userRepository.save(user);
 
         String accessToken = jwtUtil.generateToken(user.getId(), sessionId);
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), sessionId);
         return new AuthResult(accessToken, refreshToken, user.getId(), user.getName(), user.getEmail());
     }
 
@@ -112,6 +112,12 @@ public class AuthService {
         String userId = jwtUtil.extractUserId(refreshToken);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        
+        // Extract session ID from the refresh token and assert concurrency limit matches active DB ID
+        String sid = jwtUtil.extractSessionId(refreshToken);
+        if (user.getActiveSessionId() != null && !user.getActiveSessionId().isEmpty() && !user.getActiveSessionId().equals(sid)) {
+            throw new IllegalArgumentException("Session expired: duplicate login on another device.");
+        }
         
         // Pass the user's active session ID to the new access token
         String newAccess = jwtUtil.generateToken(userId, user.getActiveSessionId());

@@ -12,6 +12,7 @@ public interface MockResultRepository extends MongoRepository<MockResult, String
     Optional<MockResult> findByUserIdAndTestId(String userId, String testId);
     Page<MockResult> findByTestIdOrderByScoreDesc(String testId, Pageable pageable);
     List<MockResult> findByUserId(String userId);
+    List<MockResult> findByTestId(String testId);
     long countByTestIdAndScoreGreaterThan(String testId, int score);
     long countByTestId(String testId);
 }

@@ -62,15 +62,16 @@ public class JwtUtil {
     }
 
     public String generateRefreshToken(String userId) {
-        return buildToken(userId, refreshExpirationMs);
+        return generateRefreshToken(userId, "");
     }
 
-    private String buildToken(String subject, long ttlMs) {
+    public String generateRefreshToken(String userId, String sessionId) {
         return Jwts.builder()
-                .subject(subject)
+                .subject(userId)
+                .claim("sid", sessionId != null ? sessionId : "")
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + ttlMs))
-                .signWith(secretKey, SignatureAlgorithm.HS256) // algorithm hardcoded
+                .expiration(new Date(System.currentTimeMillis() + refreshExpirationMs))
+                .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
