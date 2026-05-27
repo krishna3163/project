@@ -28,26 +28,22 @@ const CHART_COLORS = {
 export default function ProgressPage() {
   const [progressData, setProgressData] = useState<Progress[]>([])
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  const [analytics, setAnalytics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       api.get('/api/progress/last-30-days'),
       api.get('/api/progress/snapshot'),
-    ]).then(([p, s]) => {
+      api.get('/api/analytics/history')
+    ]).then(([p, s, a]) => {
       setProgressData(p.data)
       setSnapshot(s.data)
+      setAnalytics(a.data)
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
-  const radarData = snapshot ? [
-    { metric: 'DSA', value: Math.min(100, (snapshot.dsaSolved / 200) * 100) },
-    { metric: 'Mock Tests', value: snapshot.mockScoreAvg },
-    { metric: 'Notes', value: Math.min(100, snapshot.notesCount * 10) },
-    { metric: 'Resume', value: snapshot.resumeScore },
-    { metric: 'Contests', value: 50 }, // placeholder
-    { metric: 'Consistency', value: Math.min(100, progressData.length * 3.33) },
-  ] : []
+  const radarData = analytics?.skillRadar || []
 
   const chartData = progressData.map(p => ({
     date: new Date(p.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
@@ -95,46 +91,47 @@ export default function ProgressPage() {
       )}
 
       <div className="grid grid-2" style={{ marginBottom: 28 }}>
-        {/* DSA Problems Trend */}
-        <div className="card">
-          <h3 style={{ marginBottom: 20 }}>📈 DSA Problems Solved</h3>
+        {/* XP Growth Trend */}
+        <div className="card fade-in-scale">
+          <h3 style={{ marginBottom: 20 }}>📈 Total XP Accumulation</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={chartData}>
+            <AreaChart data={analytics?.xpHistory || []}>
               <defs>
-                <linearGradient id="dsaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                <linearGradient id="xpGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.1)" />
-              <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(16,185,129,0.1)" />
+              <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} tickFormatter={(val) => new Date(val).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} />
               <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
               <Tooltip
-                contentStyle={{ background: '#0f172a', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, color: '#f1f5f9' }}
+                contentStyle={{ background: '#0f172a', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, color: '#f1f5f9' }}
+                labelFormatter={(label) => new Date(label).toLocaleDateString('en-IN', { month: 'long', day: 'numeric' })}
               />
-              <Area type="monotone" dataKey="DSA" stroke="#6366f1" strokeWidth={2} fill="url(#dsaGrad)" />
+              <Area type="monotone" dataKey="xp" name="XP Points" stroke="#10b981" strokeWidth={2} fill="url(#xpGrad)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         {/* Skills Radar */}
-        <div className="card">
-          <h3 style={{ marginBottom: 20 }}>🕸 Skills Overview</h3>
+        <div className="card fade-in-scale">
+          <h3 style={{ marginBottom: 20 }}>🕸 DSA Topic Mastery Radar</h3>
           <ResponsiveContainer width="100%" height={220}>
             <RadarChart data={radarData}>
-              <PolarGrid stroke="rgba(99,102,241,0.15)" />
-              <PolarAngleAxis dataKey="metric" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <PolarGrid stroke="rgba(245,158,11,0.15)" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
               <PolarRadiusAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 9 }} />
-              <Radar name="You" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, color: '#f1f5f9' }} />
+              <Radar name="Proficiency" dataKey="A" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.2} />
+              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, color: '#f1f5f9' }} />
             </RadarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Multi-metric line chart */}
-      <div className="card">
-        <h3 style={{ marginBottom: 20 }}>📊 30-Day Multi-Metric Trend</h3>
+      <div className="card fade-in-scale">
+        <h3 style={{ marginBottom: 20 }}>📊 30-Day Activity Breakdown</h3>
         {chartData.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
             <BarChart3 size={40} style={{ margin: '0 auto 12px', opacity: 0.4 }} />

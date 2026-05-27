@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { Briefcase, Upload, AlertCircle, Star } from 'lucide-react'
+import { Briefcase, Upload, AlertCircle, Star, Sparkles } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 
 interface Resume {
   id: string
@@ -10,6 +11,7 @@ interface Resume {
   analysisScore: number
   suggestions: string[]
   matchedKeywords: string[]
+  aiFeedback?: string
   uploadedAt: string
 }
 
@@ -132,9 +134,31 @@ export default function ResumePage() {
                 </div>
               )}
 
-              {/* Suggestions */}
-              {r.suggestions?.length > 0 && (
-                <div>
+              {/* AI Feedback Markdown */}
+              {r.aiFeedback && (
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <Sparkles size={18} color="#f59e0b" />
+                    <h4 style={{ margin: 0, color: '#f59e0b', fontSize: 15 }}>AI Analyzer Report</h4>
+                  </div>
+                  <div className="card" style={{ background: 'rgba(15,23,42,0.4)', padding: '20px 24px', fontSize: 14, color: '#e2e8f0', lineHeight: 1.6, border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <ReactMarkdown 
+                      components={{
+                        h3: ({node, ...props}) => <h3 style={{ marginTop: 0, color: '#f1f5f9', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8, marginBottom: 16 }} {...props} />,
+                        h4: ({node, ...props}) => <h4 style={{ marginTop: 20, color: '#94a3b8', marginBottom: 10 }} {...props} />,
+                        ul: ({node, ...props}) => <ul style={{ paddingLeft: 20, margin: '8px 0 16px 0' }} {...props} />,
+                        li: ({node, ...props}) => <li style={{ marginBottom: 6 }} {...props} />,
+                        code: ({node, ...props}) => <code style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '2px 6px', borderRadius: 4, fontSize: 12, fontFamily: 'monospace' }} {...props} />
+                      }}
+                    >
+                      {r.aiFeedback}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+              
+              {!r.aiFeedback && r.suggestions?.length > 0 && (
+                <div style={{ marginTop: 20 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', marginBottom: 10 }}>
                     💡 Suggestions to Improve
                   </p>

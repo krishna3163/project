@@ -15,6 +15,7 @@ interface MockTest {
   topics: string[]
   participants: number
   createdAt: string
+  createdBy: string
 }
 
 interface Analytics {
@@ -122,6 +123,17 @@ export default function MockTestsPage() {
     const copy = [...manualQuestions]
     copy[qIdx][field] = val
     setManualQuestions(copy)
+  }
+
+  const handleDeleteContest = async (testId: string) => {
+    if (!window.confirm('Are you sure you want to delete this contest? This action cannot be undone.')) return
+    try {
+      await api.delete(`/api/mock-tests/${testId}`)
+      toast.success('Contest deleted successfully!')
+      setTests(prev => prev.filter(t => t.id !== testId))
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete contest')
+    }
   }
 
   const handleCreateContest = async () => {
@@ -364,13 +376,13 @@ export default function MockTestsPage() {
           <p style={{ color: '#64748b', fontSize: 13 }}>Try resetting your search query or selecting a different test mode.</p>
         </div>
       ) : (
-        <div className="grid grid-3">
-          {filteredTests.map(test => {
+        <div className="grid grid-3 stagger">
+          {filteredTests.map((test, idx) => {
             const diffColor = getDifficultyColor(test.difficulty)
             return (
               <div
                 key={test.id}
-                className="card stagger"
+                className="card fade-in-scale"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -381,8 +393,15 @@ export default function MockTestsPage() {
                   padding: 24,
                   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
                   backdropFilter: 'blur(8px)',
-                  transition: 'transform 0.2s, border-color 0.2s',
+                  animationDelay: `${Math.min(idx * 0.07, 0.5)}s`,
+                  transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s',
                   position: 'relative'
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.transform = '';
                 }}
               >
                 {/* Header Badge */}
@@ -451,6 +470,17 @@ export default function MockTestsPage() {
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px', borderRadius: 10 }}>
                     Leaderboard
                   </Link>
+                  {test.createdBy === user?.userId && (
+                    <button
+                      className="btn-icon"
+                      onClick={() => handleDeleteContest(test.id)}
+                      title="Delete contest"
+                      id={`btn-delete-${test.id}`}
+                      style={{ width: 32, height: 32, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, flexShrink: 0 }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
             )

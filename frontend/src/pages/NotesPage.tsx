@@ -61,7 +61,7 @@ export default function NotesPage() {
 
       {/* Add form */}
       {showForm && (
-        <div className="card fade-in" style={{ marginBottom: 24 }}>
+        <div className="card slide-down" style={{ marginBottom: 24 }}>
           <h3 style={{ marginBottom: 16 }}>Add New Note</h3>
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="grid grid-2">
@@ -117,15 +117,20 @@ export default function NotesPage() {
           <p style={{ color: '#64748b', marginTop: 8 }}>Upload your first note to get started!</p>
         </div>
       ) : (
-        <div className="grid grid-3">
+        <div className="grid grid-3 stagger">
           {notes.map(note => (
-            <div key={note.id} className="card stagger">
+            <div key={note.id} className="card fade-in-scale">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{
-                  width: 40, height: 40, borderRadius: 10,
-                  background: 'rgba(34,211,238,0.15)',
+                  width: 42, height: 42, borderRadius: 12,
+                  background: 'rgba(34,211,238,0.12)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
+                  border: '1px solid rgba(34,211,238,0.2)',
+                  transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.1) rotate(8deg)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1) rotate(0deg)' }}
+                >
                   <FileText size={20} color="#22d3ee" />
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -133,13 +138,15 @@ export default function NotesPage() {
                     className="btn-icon" style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <ExternalLink size={14} />
                   </a>
-                  <button className="btn-icon" style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)', color: '#ef4444' }}
+                  <button className="btn-icon" style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', color: '#ef4444', transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.2)'; (e.currentTarget as HTMLElement).style.transform = 'scale(1.15)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(239,68,68,0.3)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                     onClick={() => handleDelete(note.id)} id={`delete-note-${note.id}`}>
                     <Trash2 size={14} />
                   </button>
                 </div>
               </div>
-              <h3 style={{ fontSize: 15, marginTop: 12 }}>{note.title}</h3>
+              <h3 style={{ fontSize: 15, marginTop: 12, transition: 'color 0.2s ease' }}>{note.title}</h3>
               {note.subject && <span className="tag" style={{ marginTop: 6 }}>{note.subject}</span>}
               <p style={{ color: '#64748b', fontSize: 12, marginTop: 8 }}>
                 {new Date(note.uploadedAt).toLocaleDateString()}

@@ -73,6 +73,27 @@ public class MockTestService {
                 .orElseThrow(() -> new IllegalArgumentException("Test not found"));
     }
 
+    public void deleteTest(String testId, String userId) {
+        MockTest test = getById(testId);
+        if (!test.getCreatedBy().equals(userId)) {
+            throw new SecurityException("You can only delete contests you created!");
+        }
+        // Delete associated results
+        List<MockResult> results = resultRepo.findByTestId(testId);
+        resultRepo.deleteAll(results);
+        // Clean up Redis sessions for this test
+        try {
+            redisTemplate.delete("session:*:" + testId);
+        } catch (Exception e) {
+            log.warn("Redis cleanup failed for test {}: {}", testId, e.getMessage());
+        }
+        testRepo.deleteById(testId);
+    }
+
+    public List<MockTest> getTestsByUser(String userId) {
+        return testRepo.findByCreatedBy(userId);
+    }
+
     /**
      * Start a new test taking session
      */

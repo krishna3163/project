@@ -5,6 +5,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
+import java.util.List;
+
 public interface MockTestRepository extends MongoRepository<MockTest, String> {
     Page<MockTest> findByCreatedBy(String userId, Pageable pageable);
+    List<MockTest> findByCreatedBy(String userId);
 }

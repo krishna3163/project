@@ -87,6 +87,7 @@ public class ResumeService {
                 resume.setAnalysisScore(result.score());
                 resume.setSuggestions(result.suggestions());
                 resume.setMatchedKeywords(result.matchedKeywords());
+                resume.setAiFeedback(result.aiFeedback());
                 resumeRepository.save(resume);
                 log.info("Resume analysis complete for resumeId: {}", resumeId);
             } catch (Exception e) {
@@ -111,7 +112,8 @@ public class ResumeService {
 
         int score = Math.min(100, (int) ((double) totalWeight / maxWeight * 100));
         List<String> suggestions = generateSuggestions(lower, matched);
-        return new ResumeAnalysisResult(score, suggestions, matched);
+        String aiFeedback = generateAiFeedback(score, matched, suggestions);
+        return new ResumeAnalysisResult(score, suggestions, matched, aiFeedback);
     }
 
     private List<String> generateSuggestions(String text, List<String> matched) {
@@ -135,5 +137,37 @@ public class ResumeService {
         return suggestions;
     }
 
-    private record ResumeAnalysisResult(int score, List<String> suggestions, List<String> matchedKeywords) {}
+    private String generateAiFeedback(int score, List<String> matched, List<String> suggestions) {
+        StringBuilder fb = new StringBuilder();
+        fb.append("### AI Resume Analysis Report\n\n");
+        
+        if (score >= 80) {
+            fb.append("🌟 **Excellent Profile!** Your resume hits many highly-valued industry keywords.\n\n");
+        } else if (score >= 50) {
+            fb.append("👍 **Solid Start.** You have a good foundation, but there is room for optimization.\n\n");
+        } else {
+            fb.append("⚠️ **Needs Work.** Your resume is missing key technical terms that ATS scanners look for.\n\n");
+        }
+
+        fb.append("#### Strengths\n");
+        if (matched.isEmpty()) {
+            fb.append("- No major tech keywords detected. Make sure you explicitly mention technologies like Java, React, or Docker.\n");
+        } else {
+            fb.append("- Strong keyword matches: `").append(String.join("`, `", matched)).append("`.\n");
+            fb.append("- Formatted well for basic text extraction.\n");
+        }
+
+        fb.append("\n#### Areas for Improvement\n");
+        for (String s : suggestions) {
+            fb.append("- ").append(s).append("\n");
+        }
+
+        fb.append("\n#### ATS Optimization Tips\n");
+        fb.append("- Ensure action verbs (e.g., *Spearheaded*, *Architected*) begin your bullet points.\n");
+        fb.append("- Include metrics (e.g., *Improved latency by 40%*).\n");
+        
+        return fb.toString();
+    }
+
+    private record ResumeAnalysisResult(int score, List<String> suggestions, List<String> matchedKeywords, String aiFeedback) {}
 }

@@ -64,10 +64,38 @@ export default function ResultCard({ result, testTitle, userName }: Readonly<Res
   }
 
   const badgeColor = {
-    GOLD: { bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)', text: '#fbbf24', icon: <Medal size={48} color="#fbbf24" /> },
-    SILVER: { bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.3)', text: '#cbd5e1', icon: <Award size={48} color="#cbd5e1" /> },
-    BRONZE: { bg: 'rgba(180,83,9,0.15)', border: 'rgba(180,83,9,0.3)', text: '#f97316', icon: <Star size={48} color="#f97316" /> },
-    PARTICIPANT: { bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.3)', text: '#818cf8', icon: <Compass size={48} color="#818cf8" /> }
+    GOLD: {
+      bg: 'rgba(251, 191, 36, 0.08)',
+      border: 'rgba(251, 191, 36, 0.25)',
+      text: '#fbbf24',
+      glow: 'rgba(251, 191, 36, 0.25)',
+      iconBg: 'radial-gradient(circle, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.02) 70%)',
+      icon: <Medal size={36} color="#fbbf24" style={{ filter: 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.5))' }} />
+    },
+    SILVER: {
+      bg: 'rgba(226, 232, 240, 0.08)',
+      border: 'rgba(226, 232, 240, 0.25)',
+      text: '#f1f5f9',
+      glow: 'rgba(226, 232, 240, 0.2)',
+      iconBg: 'radial-gradient(circle, rgba(226, 232, 240, 0.15) 0%, rgba(226, 232, 240, 0.02) 70%)',
+      icon: <Award size={36} color="#cbd5e1" style={{ filter: 'drop-shadow(0 0 8px rgba(226, 232, 240, 0.4))' }} />
+    },
+    BRONZE: {
+      bg: 'rgba(249, 115, 22, 0.08)',
+      border: 'rgba(249, 115, 22, 0.25)',
+      text: '#ff9244',
+      glow: 'rgba(249, 115, 22, 0.25)',
+      iconBg: 'radial-gradient(circle, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.02) 70%)',
+      icon: <Star size={36} color="#f97316" style={{ filter: 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.5))' }} />
+    },
+    PARTICIPANT: {
+      bg: 'rgba(99, 102, 241, 0.08)',
+      border: 'rgba(99, 102, 241, 0.25)',
+      text: '#a5b4fc',
+      glow: 'rgba(99, 102, 241, 0.25)',
+      iconBg: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.02) 70%)',
+      icon: <Compass size={36} color="#a5b4fc" style={{ filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.5))' }} />
+    }
   }
 
   const currentBadge = badgeColor[result.badge as keyof typeof badgeColor] || badgeColor.PARTICIPANT
@@ -78,61 +106,88 @@ export default function ResultCard({ result, testTitle, userName }: Readonly<Res
       <div
         ref={cardRef}
         style={{
-          background: 'linear-gradient(135deg, #1e1b4b, #0f172a)',
-          border: '1px solid rgba(99, 102, 241, 0.2)',
-          borderRadius: 24,
-          padding: '36px 32px',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+          background: 'linear-gradient(135deg, #090c15 0%, #0d1222 50%, #080a10 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.16)',
+          borderRadius: 28,
+          padding: '40px 36px',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
           position: 'relative',
           overflow: 'hidden'
         }}
       >
+        {/* Neon Top Highlight bar */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 4,
+          background: 'linear-gradient(90deg, #6366f1, #22d3ee, #ec4899, #6366f1)',
+          opacity: 0.85
+        }} />
+
         {/* Futuristic Background Glows */}
         <div style={{
-          position: 'absolute', top: '-20%', right: '-10%', width: 300, height: 300,
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)',
+          position: 'absolute', top: '-10%', right: '-10%', width: 280, height: 280,
+          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%)',
           pointerEvents: 'none'
         }} />
         <div style={{
-          position: 'absolute', bottom: '-20%', left: '-10%', width: 300, height: 300,
-          background: 'radial-gradient(circle, rgba(236, 72, 153, 0.1) 0%, transparent 70%)',
+          position: 'absolute', bottom: '-10%', left: '-10%', width: 280, height: 280,
+          background: 'radial-gradient(circle, rgba(236, 72, 153, 0.08) 0%, transparent 70%)',
           pointerEvents: 'none'
         }} />
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <span style={{
                 background: currentBadge.bg,
                 border: `1px solid ${currentBadge.border}`,
                 color: currentBadge.text,
-                padding: '4px 12px',
+                padding: '6px 14px',
                 borderRadius: 99,
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: '1px'
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: '1.5px',
+                textTransform: 'uppercase',
+                boxShadow: `0 2px 10px ${currentBadge.glow}`,
+                display: 'inline-block'
               }}>{result.badge} LEVEL</span>
             </div>
-            <h2 style={{ fontSize: 26, fontWeight: 800, color: '#f8fafc', marginBottom: 4 }}>{userName}</h2>
-            <p style={{ color: '#94a3b8', fontSize: 14 }}>{testTitle}</p>
+            <h2 style={{
+              fontSize: 32,
+              fontWeight: 900,
+              background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 50%, #94a3b8 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              marginBottom: 6,
+              letterSpacing: '-0.5px'
+            }}>{userName}</h2>
+            <p style={{ color: '#64748b', fontSize: 14, fontWeight: 500, letterSpacing: '0.2px' }}>{testTitle}</p>
           </div>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 80,
-            height: 80,
-            borderRadius: 20,
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)'
+            width: 72,
+            height: 72,
+            borderRadius: '50%',
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: `1px solid ${currentBadge.border}`,
+            boxShadow: `0 8px 24px rgba(0, 0, 0, 0.35), inset 0 2px 8px ${currentBadge.glow}`,
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-            {currentBadge.icon}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: currentBadge.iconBg,
+              zIndex: 1
+            }} />
+            <div style={{ zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {currentBadge.icon}
+            </div>
           </div>
         </div>
 
         {/* Dynamic Statistics Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16, margin: '28px 0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16, margin: '32px 0' }}>
           {[
             { label: 'Score Obtained', value: `${result.score}/${result.totalMarks}`, sub: `${result.percentage.toFixed(1)}% Score`, color: '#60a5fa' },
             { label: 'Global Standing', value: `#${result.rank}`, sub: `Top ${result.percentile.toFixed(2)}%`, color: '#34d399' },
@@ -141,23 +196,63 @@ export default function ResultCard({ result, testTitle, userName }: Readonly<Res
           ].map((stat, i) => (
             <div key={i} style={{
               background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.04)',
-              borderRadius: 16,
-              padding: '16px 12px',
+              border: '1px solid rgba(255, 255, 255, 0.05)',
+              borderRadius: 20,
+              padding: '22px 14px',
               textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02)',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              minHeight: 124
             }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>{stat.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: stat.color, marginBottom: 2 }}>{stat.value}</div>
-              <div style={{ fontSize: 12, color: '#94a3b8' }}>{stat.sub}</div>
+              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>{stat.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: stat.color, marginBottom: 4, letterSpacing: '-0.5px' }}>{stat.value}</div>
+              <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>{stat.sub}</div>
+              {/* Neon color-coded accent line at bottom of each card */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: '15%', right: '15%', height: 3,
+                background: stat.color,
+                opacity: 0.7,
+                borderRadius: '99px 99px 0 0',
+                boxShadow: `0 -1px 8px ${stat.color}`
+              }} />
             </div>
           ))}
         </div>
 
         {/* Branding Footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16 }}>
-          <span style={{ fontSize: 13, color: '#64748b', fontWeight: 700 }}>PrepNest</span>
-          <span style={{ fontSize: 11, color: '#475569' }}>dsa-tracker.prepnest.io</span>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+          paddingTop: 20,
+          marginTop: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 18, height: 18, borderRadius: 5,
+              background: 'linear-gradient(135deg, #6366f1, #22d3ee)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 900, color: '#fff'
+            }}>P</div>
+            <span style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 800, letterSpacing: '0.5px' }}>PrepNest</span>
+          </div>
+          <span style={{
+            fontSize: 11,
+            color: '#818cf8',
+            fontWeight: 700,
+            letterSpacing: '0.5px',
+            background: 'rgba(99, 102, 241, 0.06)',
+            border: '1px solid rgba(99, 102, 241, 0.12)',
+            padding: '4px 12px',
+            borderRadius: 99
+          }}>
+            dsa-tracker.prepnest.io
+          </span>
         </div>
       </div>
 

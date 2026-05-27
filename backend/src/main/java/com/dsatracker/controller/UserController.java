@@ -3,6 +3,7 @@ package com.dsatracker.controller;
 import com.dsatracker.model.User;
 import com.dsatracker.repository.UserRepository;
 import com.dsatracker.service.DsaService;
+import com.dsatracker.service.QuestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,10 +18,12 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final DsaService dsaService;
+    private final QuestService questService;
 
     @GetMapping("/me")
     public ResponseEntity<User> getMe(@AuthenticationPrincipal User user) {
         User u = userRepository.findById(user.getId()).orElseThrow();
+        questService.initializeDailyQuests(u);
         long rank = userRepository.countByXpPointsGreaterThan(u.getXpPoints()) + 1;
         u.setGlobalRank(rank);
         return ResponseEntity.ok(u);

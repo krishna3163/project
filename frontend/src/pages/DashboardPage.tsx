@@ -129,7 +129,7 @@ export default function DashboardPage() {
   return (
     <div className="page">
       {/* Welcome banner */}
-      <div style={{
+      <div className="card fade-in-scale" style={{
         background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(34,211,238,0.08) 100%)',
         border: '1px solid rgba(99,102,241,0.2)',
         borderRadius: 20, padding: '32px 36px', marginBottom: 24,
@@ -138,6 +138,7 @@ export default function DashboardPage() {
         <div style={{
           position: 'absolute', right: 40, top: '50%', transform: 'translateY(-50%)',
           fontSize: 80, opacity: 0.08, pointerEvents: 'none',
+          animation: 'pulseSlow 4s ease-in-out infinite'
         }}>🚀</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <Flame size={18} color="#f59e0b" />
@@ -155,11 +156,12 @@ export default function DashboardPage() {
 
       {/* Problem of the Day */}
       {potd && (
-        <div className="card" style={{
+        <div className="card fade-in-scale" style={{
           background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(99,102,241,0.05) 100%)',
           border: '1px solid rgba(245,158,11,0.2)',
           borderRadius: 16, padding: '24px 28px', marginBottom: 24,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20,
+          animationDelay: '0.1s'
         }}>
           <div style={{ flex: 1, minWidth: 280 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -200,8 +202,53 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Daily Quests Widget */}
+      {freshUser?.dailyQuests && Object.keys(freshUser.dailyQuests).length > 0 && (
+        <div className="card fade-in-scale" style={{
+          background: 'rgba(30, 41, 59, 0.4)',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: 16, padding: '20px 24px', marginBottom: 24,
+          animationDelay: '0.12s'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, color: '#f1f5f9' }}>
+              <span>⚔️</span> Daily Quests
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(234, 179, 8, 0.15)', padding: '4px 12px', borderRadius: 20, border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+              <span style={{ fontSize: 14 }}>🪙</span>
+              <span style={{ color: '#eab308', fontWeight: 700, fontSize: 13 }}>{freshUser.coins || 0} Coins</span>
+            </div>
+          </div>
+          <div className="grid grid-3 stagger" style={{ gap: 12 }}>
+            {Object.entries(freshUser.dailyQuests)
+              .filter(([key]) => key.startsWith(new Date().toISOString().split('T')[0]))
+              .map(([key, completed], idx) => {
+                const isCompleted = completed as boolean;
+                const title = key.split('_').slice(1).join(' ');
+                return (
+                  <div key={key} className="card fade-in-scale" style={{
+                    background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(15, 23, 42, 0.6)',
+                    border: isCompleted ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.05)',
+                    padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    animationDelay: `${idx * 0.1}s`
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: isCompleted ? '#10b981' : '#cbd5e1' }}>
+                      {title.replace(/_/g, ' ')}
+                    </span>
+                    {isCompleted ? (
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#64748b', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>+10 🪙</span>
+                    )}
+                  </div>
+                );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Unified Activity Grid Preview */}
-      <div className="card" style={{ marginBottom: 24, padding: 20 }}>
+      <div className="card fade-in-scale" style={{ marginBottom: 24, padding: 20, animationDelay: '0.15s' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
             <Flame size={16} color="#ef4444" />
@@ -247,14 +294,17 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-4" style={{ marginBottom: 24 }}>
+      <div className="grid grid-4 stagger" style={{ marginBottom: 24 }}>
         {loading
           ? Array(4).fill(0).map((_, i) => (
               <div key={i} className="skeleton" style={{ height: 120 }} />
             ))
           : stats.map(({ label, value, icon: Icon, color, link }) => (
-              <Link key={label} to={link} style={{ textDecoration: 'none' }}>
-                <div className="stat-card" style={{ cursor: 'pointer' }}>
+              <Link key={label} to={link} style={{ textDecoration: 'none' }} className="fade-in-scale">
+                <div className="stat-card" style={{ cursor: 'pointer', transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px) scale(1.02)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)' }}
+                >
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
                     background: `${color}22`, border: `1px solid ${color}40`,
@@ -272,9 +322,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Platform & LeetCode Profile Row */}
-      <div className="grid grid-2" style={{ marginBottom: 32 }}>
+      <div className="grid grid-2 stagger" style={{ marginBottom: 32 }}>
         {/* Local Platform Rank Card */}
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 20, background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(34,211,238,0.03))' }}>
+        <div className="card fade-in-scale" style={{ display: 'flex', alignItems: 'center', gap: 20, background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(34,211,238,0.03))' }}>
           <div style={{
             width: 60, height: 60, borderRadius: '50%',
             background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
@@ -293,7 +343,7 @@ export default function DashboardPage() {
         </div>
 
         {/* LeetCode Profile Card */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="card fade-in-scale" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           {freshUser?.leetcodeUsername ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -344,8 +394,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Contests Arena */}
-      <div className="grid grid-2" style={{ marginBottom: 32 }}>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', minHeight: 380 }}>
+      <div className="grid grid-2 stagger" style={{ marginBottom: 32 }}>
+        <div className="card fade-in-scale" style={{ display: 'flex', flexDirection: 'column', minHeight: 380 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
             <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Trophy size={20} color="#f59e0b" />
@@ -476,7 +526,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="card">
+        <div className="card fade-in-scale">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
             <Star size={20} color="#6366f1" />
             <h3>Quick Actions</h3>
@@ -508,7 +558,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Progress teaser */}
-      <div className="card" style={{
+      <div className="card fade-in-scale" style={{
         background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(34,211,238,0.05))',
         textAlign: 'center', padding: 32,
       }}>

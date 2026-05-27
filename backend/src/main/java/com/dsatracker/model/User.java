@@ -45,9 +45,11 @@ public class User {
 
     // Gamification
     private int xpPoints = 0;
+    private int coins = 0;
     private int dailyStreak = 0;
     private Instant lastActiveDate;
     private Set<String> badges = new HashSet<>();
+    private java.util.Map<String, Boolean> dailyQuests = new java.util.HashMap<>();
 
     // LeetCode Integration
     private String leetcodeUsername;

@@ -3,7 +3,7 @@ import { useAuth, api } from '../context/AuthContext'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Code2, FileText, Briefcase,
-  Trophy, Map, BarChart3, User, Bell, LogOut, Menu, Zap
+  Trophy, Map, BarChart3, User, Bell, LogOut, Menu, Zap, ShieldCheck, Medal
 } from 'lucide-react'
 
 const navItems = [
@@ -14,6 +14,7 @@ const navItems = [
   { to: '/resume',     icon: Briefcase,        label: 'Resume'      },
   { to: '/contests',   icon: Zap,              label: 'Contests'    },
   { to: '/roadmaps',   icon: Map,              label: 'Roadmaps'    },
+  { to: '/leaderboard',icon: Medal,            label: 'Leaderboard' },
   { to: '/progress',   icon: BarChart3,        label: 'Analytics'   },
   { to: '/profile',    icon: User,             label: 'Profile'     },
 ]
@@ -23,6 +24,11 @@ export default function Layout() {
   const [unread, setUnread] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate = useNavigate()
+
+  const visibleNavItems = [...navItems];
+  if (user?.roles?.includes('ROLE_ADMIN')) {
+    visibleNavItems.push({ to: '/admin', icon: ShieldCheck, label: 'Admin Panel' })
+  }
 
   useEffect(() => {
     api.get('/api/notifications/unread-count')
@@ -88,7 +94,7 @@ export default function Layout() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto' }}>
-          {navItems.map(({ to, icon: Icon, label }) => (
+          {visibleNavItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to} to={to}
               onClick={() => setSidebarOpen(false)}
@@ -96,13 +102,31 @@ export default function Layout() {
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 14px', borderRadius: 10, marginBottom: 4,
                 color: isActive ? '#f1f5f9' : '#64748b',
-                background: isActive ? 'rgba(99,102,241,0.2)' : 'transparent',
+                background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
                 borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
-                textDecoration: 'none', fontSize: 14, fontWeight: 500,
-                transition: 'all 0.15s ease',
+                textDecoration: 'none', fontSize: 14, fontWeight: isActive ? 600 : 500,
+                transition: 'all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                boxShadow: isActive ? '0 2px 12px rgba(99,102,241,0.2)' : 'none',
+                transform: isActive ? 'translateX(2px)' : 'translateX(0)',
               })}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLElement
+                if (!el.classList.contains('active') && !el.style.boxShadow.includes('rgba(99,102,241')) {
+                  el.style.color = '#c7d2fe'
+                  el.style.background = 'rgba(99,102,241,0.08)'
+                  el.style.transform = 'translateX(3px)'
+                }
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLElement
+                if (!el.getAttribute('aria-current')) {
+                  el.style.color = ''
+                  el.style.background = ''
+                  el.style.transform = ''
+                }
+              }}
             >
-              <Icon size={18} />
+              <Icon size={18} style={{ transition: 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
               {label}
             </NavLink>
           ))}

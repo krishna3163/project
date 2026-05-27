@@ -36,6 +36,8 @@ public class Resume {
     private List<String> suggestions = new ArrayList<>();
 
     private List<String> matchedKeywords = new ArrayList<>();
+    
+    private String aiFeedback;
 
     @CreatedDate
     private Instant uploadedAt;

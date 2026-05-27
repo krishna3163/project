@@ -64,7 +64,7 @@ export default function ContestsPage() {
               className="btn btn-sm"
               style={{
                 background: platform === p
-                  ? (colors ? colors.bg : 'rgba(99,102,241,0.25)')
+                  ? (colors ? colors.bg : 'rgba(99,102,241,0.22)')
                   : 'transparent',
                 color: platform === p
                   ? (colors ? colors.text : '#818cf8')
@@ -72,6 +72,11 @@ export default function ContestsPage() {
                 border: `1px solid ${platform === p
                   ? (colors ? colors.border : 'rgba(99,102,241,0.4)')
                   : 'rgba(99,102,241,0.1)'}`,
+                transform: platform === p ? 'scale(1.05)' : 'scale(1)',
+                boxShadow: platform === p
+                  ? `0 4px 12px ${colors ? colors.bg : 'rgba(99,102,241,0.2)'}`
+                  : 'none',
+                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
               }}
               id={`filter-${p.toLowerCase()}`}
             >{p}</button>
@@ -90,23 +95,36 @@ export default function ContestsPage() {
           <p style={{ color: '#64748b', marginTop: 8 }}>Check back later – contests are fetched every 6 hours.</p>
         </div>
       ) : (
-        <div className="grid grid-2">
-          {filtered.map(c => {
+        <div className="grid grid-2 stagger">
+          {filtered.map((c, i) => {
             const clr = PLATFORM_COLORS[c.platform] || { bg: 'rgba(99,102,241,0.12)', text: '#818cf8', border: 'rgba(99,102,241,0.3)' }
             return (
-              <div key={c.id} className="card"
+              <div key={c.id} className="card fade-in-scale"
                 style={{
                   borderLeft: `4px solid ${clr.text}`,
-                  transition: 'all 0.2s',
-                }}>
+                  animationDelay: `${Math.min(i * 0.07, 0.6)}s`,
+                  boxShadow: `0 0 0 rgba(0,0,0,0)`,
+                  transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${clr.bg}, 0 0 20px ${clr.bg}`
+                  ;(e.currentTarget as HTMLElement).style.borderLeftColor = clr.text
+                  ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = ''
+                  ;(e.currentTarget as HTMLElement).style.transform = ''
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <span style={{
                     fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
                     background: clr.bg, color: clr.text, border: `1px solid ${clr.border}`,
+                    transition: 'transform 0.2s ease',
                   }}>{c.platform}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#f59e0b', fontSize: 13, fontWeight: 600 }}>
                     <Clock size={13} />
-                    {getTimeUntil(c.startTime)}
+                    <span style={{ animation: 'pulseSlow 2s ease-in-out infinite' }}>{getTimeUntil(c.startTime)}</span>
                   </div>
                 </div>
                 <h3 style={{ fontSize: 15, marginBottom: 12, lineHeight: 1.4 }}>{c.name}</h3>

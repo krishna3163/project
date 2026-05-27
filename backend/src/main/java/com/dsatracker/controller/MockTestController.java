@@ -107,4 +107,17 @@ public class MockTestController {
     public ResponseEntity<MockResult> getByShareId(@PathVariable String shareId) {
         return ResponseEntity.ok(mockTestService.getResultByShareId(shareId));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            @PathVariable String id,
+            @AuthenticationPrincipal User user) {
+        mockTestService.deleteTest(id, user.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/my-tests")
+    public ResponseEntity<List<MockTest>> myTests(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(mockTestService.getTestsByUser(user.getId()));
+    }
 }

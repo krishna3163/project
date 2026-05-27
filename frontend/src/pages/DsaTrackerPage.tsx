@@ -186,22 +186,34 @@ export default function DsaTrackerPage() {
                     padding: '14px 20px', alignItems: 'center',
                     borderBottom: '1px solid rgba(99,102,241,0.06)',
                     background: solved ? 'rgba(16,185,129,0.04)' : 'transparent',
-                    animationDelay: `${i * 0.03}s`,
-                    transition: 'background 0.15s',
+                    animationDelay: `${Math.min(i * 0.03, 0.5)}s`,
+                    transition: 'background 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease',
                   }}
-                  onMouseEnter={e => { if (!solved) e.currentTarget.style.background = 'rgba(99,102,241,0.05)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = solved ? 'rgba(16,185,129,0.04)' : 'transparent' }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = solved ? 'rgba(16,185,129,0.08)' : 'rgba(99,102,241,0.05)'
+                    e.currentTarget.style.transform = 'translateX(4px)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = solved ? 'rgba(16,185,129,0.04)' : 'transparent'
+                    e.currentTarget.style.transform = 'translateX(0)'
+                  }}
                 >
                   <button
                     onClick={() => toggleSolved(p)}
                     disabled={solving === p.id}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                      transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                    onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'scale(1.25) rotate(10deg)' }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)' }}
                     id={`solve-${p.id}`}
                   >
                     {solving === p.id ? (
                       <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
                     ) : solved ? (
-                      <CheckCircle2 size={20} color="#10b981" />
+                      <CheckCircle2 size={20} color="#10b981" style={{ filter: 'drop-shadow(0 0 4px rgba(16,185,129,0.5))' }} />
                     ) : (
                       <Circle size={20} color="#64748b" />
                     )}
@@ -210,7 +222,8 @@ export default function DsaTrackerPage() {
                     fontSize: 14, fontWeight: 500,
                     color: solved ? '#10b981' : '#f1f5f9',
                     textDecoration: solved ? 'line-through' : 'none',
-                    opacity: solved ? 0.8 : 1,
+                    opacity: solved ? 0.75 : 1,
+                    transition: 'color 0.2s ease, opacity 0.2s ease',
                   }}>{p.title}</span>
                   <span style={{
                     fontSize: 12, fontWeight: 600,
@@ -218,6 +231,8 @@ export default function DsaTrackerPage() {
                     background: `${difficultyColor(p.difficulty)}15`,
                     padding: '2px 8px', borderRadius: 20,
                     display: 'inline-block',
+                    border: `1px solid ${difficultyColor(p.difficulty)}30`,
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                   }}>{p.difficulty}</span>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {p.tags.slice(0, 3).map(t => <span key={t} className="tag">{t}</span>)}

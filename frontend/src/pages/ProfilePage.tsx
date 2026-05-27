@@ -198,7 +198,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Main card */}
-      <div className="card" style={{ marginBottom: 24, position: 'relative', overflow: 'hidden' }}>
+      <div className="card fade-in-scale" style={{ marginBottom: 24, position: 'relative', overflow: 'hidden' }}>
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 100,
           background: 'linear-gradient(90deg, #6366f1, #22d3ee)', opacity: 0.15
@@ -251,7 +251,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Contribution Calendar Grid */}
-      <div className="card" style={{ marginBottom: 24, padding: 24 }}>
+      <div className="card fade-in-scale" style={{ marginBottom: 24, padding: 24, animationDelay: '0.1s' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 16 }}>
             <Flame size={18} color="#ef4444" />
@@ -307,7 +307,7 @@ export default function ProfilePage() {
 
       {editing ? (
         /* Edit Profile Form */
-        <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card slide-down" style={{ marginBottom: 24 }}>
           <h3 style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Edit2 size={18} color="#6366f1" />
             Edit Profile & Coding Accounts
@@ -430,10 +430,10 @@ export default function ProfilePage() {
         </div>
       ) : (
         /* Read-Only Profile View */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           
           {/* Completed Contests / Test History */}
-          <div className="card">
+          <div className="card fade-in-scale">
             <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
               <Trophy size={18} color="#f59e0b" />
               Completed Contests History
@@ -473,7 +473,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Friends Comparison & LeetCode Compare Dashboard */}
-          <div className="card">
+          <div className="card fade-in-scale">
             <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
               <Users size={18} color="#818cf8" />
               Compare Friends Dashboard (Max 5)
@@ -558,7 +558,7 @@ export default function ProfilePage() {
 
           {/* LeetCode Integration */}
           {profile?.leetcodeUsername && (
-            <div className="card">
+            <div className="card fade-in-scale">
               <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
                 <Star size={18} color="#ffa116" />
                 LeetCode Stats Sync
@@ -594,7 +594,7 @@ export default function ProfilePage() {
           )}
 
           {/* Social & Professional Connections */}
-          <div className="card">
+          <div className="card fade-in-scale">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 15 }}>Connected Accounts</h3>
               <button
@@ -635,7 +635,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Personal Information (PII Masking Active) */}
-          <div className="card">
+          <div className="card fade-in-scale">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
                 <ShieldCheck size={18} color="#10b981" />
@@ -666,7 +666,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Badges Achievements */}
-          <div className="card">
+          <div className="card fade-in-scale">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <Award size={18} color="#f59e0b" />
               <h3 style={{ margin: 0, fontSize: 15 }}>Unlocked Achievements</h3>
