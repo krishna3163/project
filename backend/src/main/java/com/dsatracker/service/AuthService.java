@@ -37,23 +37,58 @@ public class AuthService {
     @Value("${app.otp.ttl-seconds}")
     private long otpTtlSeconds;
 
+    private final java.util.concurrent.ConcurrentHashMap<String, OtpValue> inMemoryOtpStore = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record OtpValue(String otp, Instant expiresAt) {}
+
     /** Generates OTP, stores in Redis, sends email. */
     public void sendOtp(String email) {
         // Use cryptographically secure random numeric OTP
-        String otp = RandomStringUtils.secure().nextNumeric(6);
-        redisTemplate.opsForValue().set(otpKey(email), otp, otpTtlSeconds, TimeUnit.SECONDS);
+        String otp = String.format("%06d", new java.security.SecureRandom().nextInt(1000000));
+        try {
+            redisTemplate.opsForValue().set(otpKey(email), otp, otpTtlSeconds, TimeUnit.SECONDS);
+            log.info("Saved OTP to Redis for email: [REDACTED]");
+        } catch (Exception e) {
+            log.warn("Redis is not available. Falling back to in-memory store. Error: {}", e.getMessage());
+            inMemoryOtpStore.put(otpKey(email), new OtpValue(otp, Instant.now().plusSeconds(otpTtlSeconds)));
+        }
         emailService.sendOtp(email, otp);
         log.info("OTP sent for email: [REDACTED]");
     }
 
     /** Verifies OTP; returns JWT tokens on success. */
     public AuthResult verifyOtp(String email, String otp) {
-        String stored = redisTemplate.opsForValue().get(otpKey(email));
+        String stored = null;
+        boolean usingRedis = true;
+        try {
+            stored = redisTemplate.opsForValue().get(otpKey(email));
+        } catch (Exception e) {
+            log.warn("Redis is not available. Reading OTP from in-memory store. Error: {}", e.getMessage());
+            usingRedis = false;
+            OtpValue val = inMemoryOtpStore.get(otpKey(email));
+            if (val != null) {
+                if (val.expiresAt().isAfter(Instant.now())) {
+                    stored = val.otp();
+                } else {
+                    inMemoryOtpStore.remove(otpKey(email));
+                }
+            }
+        }
+
         if (stored == null || !stored.equals(otp)) {
             throw new IllegalArgumentException("Invalid or expired OTP");
         }
+
         // Delete OTP immediately after use (single-use)
-        redisTemplate.delete(otpKey(email));
+        if (usingRedis) {
+            try {
+                redisTemplate.delete(otpKey(email));
+            } catch (Exception e) {
+                log.warn("Failed to delete OTP from Redis: {}", e.getMessage());
+            }
+        } else {
+            inMemoryOtpStore.remove(otpKey(email));
+        }
 
         User user = userRepository.findByEmail(email).orElseGet(() -> registerNewUser(email));
         user.setEmailVerified(true);
