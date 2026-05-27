@@ -76,7 +76,7 @@ public class DsaService {
                         "submitStats { acSubmissionNum { difficulty count } } " +
                     "} " +
                     "recentAcSubmissionList(username: $username, limit: 100) { " +
-                        "titleSlug " +
+                        "titleSlug timestamp " +
                     "} " +
                     "}\",\"variables\":{\"username\":\"" + leetcodeUsername.trim() + "\"}}";
 
@@ -116,6 +116,23 @@ public class DsaService {
                 for (com.fasterxml.jackson.databind.JsonNode subNode : submissions) {
                     String titleSlug = subNode.path("titleSlug").asText().toLowerCase().trim();
                     if (titleSlug.isEmpty()) continue;
+
+                    // Parse timestamp to record active day
+                    long timestamp = subNode.path("timestamp").asLong();
+                    if (timestamp > 0) {
+                        try {
+                            String dateStr = java.time.Instant.ofEpochSecond(timestamp)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate()
+                                    .toString();
+                            if (user.getActiveDates() == null) {
+                                user.setActiveDates(new java.util.HashSet<>());
+                            }
+                            user.getActiveDates().add(dateStr);
+                        } catch (Exception ex) {
+                            log.warn("Failed to parse submission timestamp: {}", ex.getMessage());
+                        }
+                    }
 
                     String normalizedMatch = "/problems/" + titleSlug;
                     for (DsaProblem problem : localProblems) {

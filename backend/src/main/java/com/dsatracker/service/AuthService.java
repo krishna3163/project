@@ -93,9 +93,14 @@ public class AuthService {
         User user = userRepository.findByEmail(email).orElseGet(() -> registerNewUser(email));
         user.setEmailVerified(true);
         user.setLastActiveDate(Instant.now());
+
+        // Generate new active Session ID for single-device concurrency limits
+        String sessionId = java.util.UUID.randomUUID().toString();
+        user.setActiveSessionId(sessionId);
+
         userRepository.save(user);
 
-        String accessToken = jwtUtil.generateToken(user.getId());
+        String accessToken = jwtUtil.generateToken(user.getId(), sessionId);
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
         return new AuthResult(accessToken, refreshToken, user.getId(), user.getName(), user.getEmail());
     }
@@ -107,7 +112,9 @@ public class AuthService {
         String userId = jwtUtil.extractUserId(refreshToken);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        String newAccess = jwtUtil.generateToken(userId);
+        
+        // Pass the user's active session ID to the new access token
+        String newAccess = jwtUtil.generateToken(userId, user.getActiveSessionId());
         return new AuthResult(newAccess, refreshToken, user.getId(), user.getName(), user.getEmail());
     }
 
@@ -116,7 +123,13 @@ public class AuthService {
         u.setEmail(email);
         u.setName(email.split("@")[0]); // default name from email prefix
         u.setCreatedAt(Instant.now());
-        return userRepository.save(u);
+        User saved = userRepository.save(u);
+        try {
+            emailService.sendWelcomeEmail(saved.getEmail(), saved.getName());
+        } catch (Exception e) {
+            log.error("Failed to send welcome email to {}: {}", saved.getEmail(), e.getMessage());
+        }
+        return saved;
     }
 
     private String otpKey(String email) {

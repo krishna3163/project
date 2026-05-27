@@ -9,7 +9,7 @@
 
 /// <reference types="vite/client" />
 import axios from 'axios'
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, useEffect, type ReactNode } from 'react'
 
 const BASE = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -40,7 +40,8 @@ api.interceptors.response.use(
         return api(original)
       } catch {
         clearTokens()
-        globalThis.location.href = '/login'
+        document.cookie = "refresh_token=;path=/;max-age=0"
+        globalThis.location.href = '/login?concurrent=true'
       }
     }
     throw error
@@ -72,7 +73,30 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // Silent restore on mount
+  useEffect(() => {
+    const restoreSession = async () => {
+      const match = document.cookie.match(/(^|;)\s*refresh_token\s*=\s*([^;]+)/)
+      const token = match ? match[2] : null
+      if (token) {
+        _refreshToken = token
+        try {
+          const res = await axios.post(`${BASE}/api/auth/refresh`, { refreshToken: token })
+          _accessToken = res.data.accessToken
+          // Read user profile details to populate name, email
+          const meRes = await api.get('/api/users/me')
+          setUser({ userId: meRes.data.id, name: meRes.data.name, email: meRes.data.email })
+        } catch (err) {
+          clearTokens()
+          document.cookie = "refresh_token=;path=/;max-age=0"
+        }
+      }
+      setLoading(false)
+    }
+    restoreSession()
+  }, [])
 
   const sendOtp = useCallback(async (email: string) => {
     setLoading(true)
@@ -89,6 +113,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
       const res = await api.post('/api/auth/verify-otp', { email, otp })
       _accessToken = res.data.accessToken
       _refreshToken = res.data.refreshToken
+      document.cookie = `refresh_token=${res.data.refreshToken};path=/;max-age=2592000;SameSite=Lax`
       setUser({ userId: res.data.userId, name: res.data.name, email: res.data.email })
     } finally {
       setLoading(false)
@@ -97,8 +122,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const logout = useCallback(() => {
     clearTokens()
+    document.cookie = "refresh_token=;path=/;max-age=0"
     setUser(null)
-    // Full reload clears all React state and cache
     globalThis.location.href = '/login'
   }, [])
 

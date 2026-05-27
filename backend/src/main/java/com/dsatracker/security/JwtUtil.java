@@ -48,7 +48,17 @@ public class JwtUtil {
     }
 
     public String generateToken(String userId) {
-        return buildToken(userId, expirationMs);
+        return generateToken(userId, "");
+    }
+
+    public String generateToken(String userId, String sessionId) {
+        return Jwts.builder()
+                .subject(userId)
+                .claim("sid", sessionId != null ? sessionId : "")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .signWith(secretKey, SignatureAlgorithm.HS256)
+                .compact();
     }
 
     public String generateRefreshToken(String userId) {
@@ -57,9 +67,9 @@ public class JwtUtil {
 
     private String buildToken(String subject, long ttlMs) {
         return Jwts.builder()
-                .setSubject(subject)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + ttlMs))
+                .subject(subject)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + ttlMs))
                 .signWith(secretKey, SignatureAlgorithm.HS256) // algorithm hardcoded
                 .compact();
     }
@@ -67,6 +77,11 @@ public class JwtUtil {
     /** Returns userId extracted from a valid, non-expired token; throws on error. */
     public String extractUserId(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    public String extractSessionId(String token) {
+        Object sid = parseClaims(token).get("sid");
+        return sid != null ? String.valueOf(sid) : "";
     }
 
     public boolean validateToken(String token) {

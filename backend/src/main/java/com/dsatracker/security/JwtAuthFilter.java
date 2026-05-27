@@ -41,6 +41,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String userId = jwtUtil.extractUserId(token);
                 User user = userRepository.findById(userId).orElse(null);
                 if (user != null) {
+                    // Verify single active device session ID matches
+                    String sid = jwtUtil.extractSessionId(token);
+                    if (user.getActiveSessionId() != null && !user.getActiveSessionId().isEmpty() && !user.getActiveSessionId().equals(sid)) {
+                        log.warn("Stale session detected for user {}. Invalidating duplicate device login.", user.getEmail());
+                        SecurityContextHolder.clearContext();
+                        chain.doFilter(request, response);
+                        return;
+                    }
                     var authorities = user.getRoles().stream()
                             .map(SimpleGrantedAuthority::new)
                             .collect(Collectors.toList());

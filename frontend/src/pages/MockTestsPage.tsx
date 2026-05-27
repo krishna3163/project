@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Trophy, Clock, Users, Play, Search, Filter } from 'lucide-react'
+import { Trophy, Clock, Users, Play, Search, Filter, Plus, X, FileJson, FormInput, HelpCircle, Trash2 } from 'lucide-react'
 
 interface MockTest {
   id: string
@@ -33,23 +33,50 @@ export default function MockTestsPage() {
   const [difficultyFilter, setDifficultyFilter] = useState('all')
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
 
+  // Create Contest State
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createTitle, setCreateTitle] = useState('')
+  const [createDesc, setCreateDesc] = useState('')
+  const [createDuration, setCreateDuration] = useState(30)
+  const [createDifficulty, setCreateDifficulty] = useState('Medium')
+  const [createTopics, setCreateTopics] = useState('')
+  const [createType, setCreateType] = useState('practice')
+  const [inputStyle, setInputStyle] = useState<'manual' | 'json'>('manual')
+
+  // Manual Builder Questions State
+  const [manualQuestions, setManualQuestions] = useState<any[]>([
+    { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '', marks: 10 }
+  ])
+
+  // Bulk JSON Input State
+  const [jsonText, setJsonText] = useState(
+`[
+  {
+    "text": "What is the average time complexity of searching in a Hash Map?",
+    "options": ["O(N)", "O(log N)", "O(1)", "O(N log N)"],
+    "correctOption": 2,
+    "explanation": "Hash tables offer average constant time O(1) searches.",
+    "marks": 10
+  }
+]`
+  )
+
   useEffect(() => {
-    // Fetch mock tests
-    api.get('/api/mock-tests', { params: { size: 50 } })
-      .then(r => setTests(r.data.content || []))
-      .catch(() => toast.error('Failed to load mock tests'))
-      .finally(() => setLoading(false))
+    fetchTests()
 
     // Fetch user analytics
     if (user?.userId) {
       api.get(`/api/mock-tests/analytics/${user.userId}`)
         .then(r => setAnalytics(r.data))
-        .catch(() => logAnalyticsError())
+        .catch(() => {})
     }
   }, [user])
 
-  const logAnalyticsError = () => {
-    // Quietly log or ignore analytics failure
+  const fetchTests = () => {
+    api.get('/api/mock-tests', { params: { size: 50 } })
+      .then(r => setTests(r.data.content || []))
+      .catch(() => toast.error('Failed to load mock tests'))
+      .finally(() => setLoading(false))
   }
 
   // Filter logic
@@ -73,14 +100,139 @@ export default function MockTestsPage() {
     }
   }
 
+  const handleAddManualQuestion = () => {
+    setManualQuestions([...manualQuestions, { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '', marks: 10 }])
+  }
+
+  const handleRemoveManualQuestion = (idx: number) => {
+    if (manualQuestions.length <= 1) {
+      toast.error('Contest must contain at least one question!')
+      return
+    }
+    setManualQuestions(manualQuestions.filter((_, i) => i !== idx))
+  }
+
+  const handleManualOptionChange = (qIdx: number, oIdx: number, val: string) => {
+    const copy = [...manualQuestions]
+    copy[qIdx].options[oIdx] = val
+    setManualQuestions(copy)
+  }
+
+  const handleManualQuestionChange = (qIdx: number, field: string, val: any) => {
+    const copy = [...manualQuestions]
+    copy[qIdx][field] = val
+    setManualQuestions(copy)
+  }
+
+  const handleCreateContest = async () => {
+    if (!createTitle.trim()) {
+      toast.error('Please enter a contest title')
+      return
+    }
+
+    const topicsArr = createTopics.split(',').map(s => s.trim()).filter(Boolean)
+    let finalQuestions = []
+
+    if (inputStyle === 'json') {
+      try {
+        const parsed = JSON.parse(jsonText)
+        if (!Array.isArray(parsed)) throw new Error('Root must be an array of questions')
+        
+        finalQuestions = parsed.map((q, idx) => {
+          if (!q.text) throw new Error(`Question ${idx + 1} is missing 'text'`)
+          if (!Array.isArray(q.options) || q.options.length < 2) {
+            throw new Error(`Question ${idx + 1} must carry an 'options' array containing at least 2 options`)
+          }
+          if (typeof q.correctOption !== 'number' || q.correctOption < 0 || q.correctOption >= q.options.length) {
+            throw new Error(`Question ${idx + 1} has an invalid 'correctOption' index`)
+          }
+          return {
+            id: `q_${idx + 1}`,
+            text: q.text,
+            type: 'mcq',
+            options: q.options,
+            correctOption: q.correctOption,
+            explanation: q.explanation || '',
+            marks: q.marks || 10
+          }
+        })
+      } catch (err: any) {
+        toast.error(`JSON parse validation failed: ${err.message}`)
+        return
+      }
+    } else {
+      // Validate manual questions
+      for (let i = 0; i < manualQuestions.length; i++) {
+        const mq = manualQuestions[i]
+        if (!mq.text.trim()) {
+          toast.error(`Question ${i + 1} text is required`)
+          return
+        }
+        if (mq.options.some((o: string) => !o.trim())) {
+          toast.error(`Question ${i + 1} has empty choice fields`)
+          return
+        }
+      }
+      finalQuestions = manualQuestions.map((mq, idx) => ({
+        id: `q_${idx + 1}`,
+        text: mq.text,
+        type: 'mcq',
+        options: mq.options,
+        correctOption: parseInt(mq.correctOption),
+        explanation: mq.explanation,
+        marks: parseInt(mq.marks) || 10
+      }))
+    }
+
+    const payload = {
+      title: createTitle,
+      description: createDesc,
+      type: createType,
+      duration: createDuration,
+      totalMarks: finalQuestions.reduce((sum, q) => sum + q.marks, 0),
+      difficulty: createDifficulty,
+      topics: topicsArr,
+      questions: finalQuestions
+    }
+
+    try {
+      const res = await api.post('/api/mock-tests', payload)
+      toast.success('Contest created and listed! 🏆')
+      setShowCreateModal(false)
+      setTests([res.data, ...tests])
+
+      // Reset Form State
+      setCreateTitle('')
+      setCreateDesc('')
+      setCreateDuration(30)
+      setCreateDifficulty('Medium')
+      setCreateTopics('')
+      setCreateType('practice')
+      setManualQuestions([{ text: '', options: ['', '', '', ''], correctOption: 0, explanation: '', marks: 10 }])
+    } catch {
+      toast.error('Failed to create contest')
+    }
+  }
+
   return (
-    <div className="page" style={{ color: '#f8fafc' }}>
+    <div className="page" style={{ color: '#f8fafc', paddingBottom: 60 }}>
       {/* Title Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20, marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, background: 'linear-gradient(90deg, #818cf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 6 }}>PrepNest Mock Arena</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 800, background: 'linear-gradient(90deg, #818cf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 6 }}>
+            PrepNest Mock Arena
+          </h1>
           <p style={{ color: '#94a3b8', fontSize: 14 }}>Practice at your own pace or compete in high-stakes timed coding challenges.</p>
         </div>
+        <button
+          className="btn btn-primary"
+          onClick={() => setShowCreateModal(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          id="btn-trigger-create-contest"
+        >
+          <Plus size={16} />
+          Create Contest 🏆
+        </button>
       </div>
 
       {/* Analytics Dashboard Grid */}
@@ -303,6 +455,319 @@ export default function MockTestsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Create Contest Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(8, 12, 20, 0.85)',
+          backdropFilter: 'blur(12px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: 20
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: 24,
+            width: '100%',
+            maxWidth: 760,
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: 32,
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+            position: 'relative'
+          }} className="scale-in">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowCreateModal(false)}
+              style={{
+                position: 'absolute', top: 20, right: 20,
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: 'none', borderRadius: '50%',
+                width: 32, height: 32,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#94a3b8'
+              }}
+              id="btn-close-create-modal"
+            >
+              <X size={16} />
+            </button>
+
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4, background: 'linear-gradient(90deg, #6366f1, #22d3ee)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Create Custom MCQ Contest 🏆
+            </h2>
+            <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>Design a practice set or competition for PrepNest candidates.</p>
+
+            {/* General Details */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Contest Title</label>
+                <input
+                  className="input"
+                  placeholder="e.g. Dynamic Programming Masters Contest"
+                  value={createTitle}
+                  onChange={e => setCreateTitle(e.target.value)}
+                  id="contest-title"
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Description</label>
+                <textarea
+                  className="input"
+                  placeholder="Describe the rules, target audience, or covered syllabus..."
+                  value={createDesc}
+                  onChange={e => setCreateDesc(e.target.value)}
+                  style={{ minHeight: 60, resize: 'vertical' }}
+                  id="contest-desc"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Duration (Minutes)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    value={createDuration}
+                    onChange={e => setCreateDuration(parseInt(e.target.value) || 0)}
+                    id="contest-duration"
+                  />
+                </div>
+
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Difficulty</label>
+                  <select
+                    className="input"
+                    value={createDifficulty}
+                    onChange={e => setCreateDifficulty(e.target.value)}
+                    style={{ cursor: 'pointer' }}
+                    id="contest-difficulty"
+                  >
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Contest Mode</label>
+                  <select
+                    className="input"
+                    value={createType}
+                    onChange={e => setCreateType(e.target.value)}
+                    style={{ cursor: 'pointer' }}
+                    id="contest-type"
+                  >
+                    <option value="practice">Practice Mode (Multiple attempts)</option>
+                    <option value="competition">Competition Mode (Strict 1 timed attempt)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Covered Topics (Comma separated)</label>
+                <input
+                  className="input"
+                  placeholder="e.g. DP, Recursion, Memoization"
+                  value={createTopics}
+                  onChange={e => setCreateTopics(e.target.value)}
+                  id="contest-topics"
+                />
+              </div>
+            </div>
+
+            <hr style={{ border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', margin: '24px 0' }} />
+
+            {/* Selection of input style */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+                Questions Database Setup
+              </h3>
+              <div style={{ display: 'flex', gap: 8, background: 'rgba(0,0,0,0.2)', padding: 3, borderRadius: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setInputStyle('manual')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                    borderRadius: 6, border: 'none', fontSize: 12, cursor: 'pointer',
+                    background: inputStyle === 'manual' ? '#6366f1' : 'transparent',
+                    color: inputStyle === 'manual' ? '#fff' : '#64748b',
+                    transition: 'all 0.15s'
+                  }}
+                  id="btn-select-manual"
+                >
+                  <FormInput size={13} /> Form Builder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputStyle('json')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                    borderRadius: 6, border: 'none', fontSize: 12, cursor: 'pointer',
+                    background: inputStyle === 'json' ? '#6366f1' : 'transparent',
+                    color: inputStyle === 'json' ? '#fff' : '#64748b',
+                    transition: 'all 0.15s'
+                  }}
+                  id="btn-select-json"
+                >
+                  <FileJson size={13} /> JSON Bulk Paste
+                </button>
+              </div>
+            </div>
+
+            {/* Input Blocks */}
+            {inputStyle === 'json' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 10, padding: 12, fontSize: 12, color: '#a5b4fc' }}>
+                  <HelpCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div>
+                    <strong>Pasting Guidelines:</strong> Paste a JSON array containing questions. Each question must include <code>"text"</code>, <code>"options"</code> array, and 0-indexed <code>"correctOption"</code>. Optional fields are <code>"explanation"</code> and <code>"marks"</code>.
+                  </div>
+                </div>
+
+                <textarea
+                  className="input"
+                  value={jsonText}
+                  onChange={e => setJsonText(e.target.value)}
+                  style={{ fontFamily: 'monospace', minHeight: 200, fontSize: 12, resize: 'vertical' }}
+                  id="json-textarea"
+                />
+              </div>
+            ) : (
+              /* Manual Questions Form Builder */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {manualQuestions.map((q, qIdx) => (
+                  <div
+                    key={qIdx}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.04)',
+                      borderRadius: 16,
+                      padding: 20,
+                      position: 'relative'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <span style={{ fontSize: 12, color: '#6366f1', fontWeight: 700 }}>Question #{qIdx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveManualQuestion(qIdx)}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                        id={`btn-remove-q-${qIdx}`}
+                      >
+                        <Trash2 size={12} /> Remove
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Question Text</label>
+                        <input
+                          className="input"
+                          placeholder="What is the output of..."
+                          value={q.text}
+                          onChange={e => handleManualQuestionChange(qIdx, 'text', e.target.value)}
+                          id={`manual-q-text-${qIdx}`}
+                        />
+                      </div>
+
+                      {/* Options Grid */}
+                      <div>
+                        <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 6 }}>Options Choices</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          {q.options.map((option: string, oIdx: number) => (
+                            <input
+                              key={oIdx}
+                              className="input"
+                              placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
+                              value={option}
+                              onChange={e => handleManualOptionChange(qIdx, oIdx, e.target.value)}
+                              id={`manual-q-${qIdx}-opt-${oIdx}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 140 }}>
+                          <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Correct Option</label>
+                          <select
+                            className="input"
+                            value={q.correctOption}
+                            onChange={e => handleManualQuestionChange(qIdx, 'correctOption', e.target.value)}
+                            style={{ cursor: 'pointer' }}
+                            id={`manual-q-correct-${qIdx}`}
+                          >
+                            <option value={0}>Option A</option>
+                            <option value={1}>Option B</option>
+                            <option value={2}>Option C</option>
+                            <option value={3}>Option D</option>
+                          </select>
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 140 }}>
+                          <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Marks / Score</label>
+                          <input
+                            className="input"
+                            type="number"
+                            value={q.marks}
+                            onChange={e => handleManualQuestionChange(qIdx, 'marks', e.target.value)}
+                            id={`manual-q-marks-${qIdx}`}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Explanation (Optional)</label>
+                        <input
+                          className="input"
+                          placeholder="Explain why this choice is correct..."
+                          value={q.explanation}
+                          onChange={e => handleManualQuestionChange(qIdx, 'explanation', e.target.value)}
+                          id={`manual-q-explanation-${qIdx}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={handleAddManualQuestion}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 12 }}
+                  id="btn-add-question"
+                >
+                  <Plus size={14} /> Add Another Question
+                </button>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 32 }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowCreateModal(false)}
+                id="btn-cancel-create"
+              >
+                Discard
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateContest}
+                id="btn-submit-contest"
+              >
+                Publish Contest 🚀
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

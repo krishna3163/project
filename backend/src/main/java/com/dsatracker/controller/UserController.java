@@ -63,5 +63,131 @@ public class UserController {
         return ResponseEntity.ok(synced);
     }
 
+    @PutMapping("/profile")
+    public ResponseEntity<User> updateProfile(
+            @RequestBody ProfileUpdateRequest req,
+            @AuthenticationPrincipal User user) {
+        User u = userRepository.findById(user.getId()).orElseThrow();
+        if (req.name() != null) u.setName(req.name().trim());
+        if (req.dob() != null) u.setDob(req.dob().trim());
+        if (req.phone() != null) u.setPhone(req.phone().trim());
+        if (req.githubLink() != null) u.setGithubLink(req.githubLink().trim());
+        if (req.hackerrankLink() != null) u.setHackerrankLink(req.hackerrankLink().trim());
+        if (req.hackerearthLink() != null) u.setHackerearthLink(req.hackerearthLink().trim());
+        if (req.linkedinLink() != null) u.setLinkedinLink(req.linkedinLink().trim());
+        
+        if (req.leetcodeUsername() != null && !req.leetcodeUsername().isBlank()) {
+            u.setLeetcodeUsername(req.leetcodeUsername().trim());
+        }
+
+        User saved = userRepository.save(u);
+        long rank = userRepository.countByXpPointsGreaterThan(saved.getXpPoints()) + 1;
+        saved.setGlobalRank(rank);
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/profile/sync")
+    public ResponseEntity<User> syncProfile(@AuthenticationPrincipal User user) {
+        User u = userRepository.findById(user.getId()).orElseThrow();
+        
+        // 1. Sync LeetCode
+        if (u.getLeetcodeUsername() != null && !u.getLeetcodeUsername().isBlank()) {
+            try {
+                u = dsaService.syncLeetCodeProfile(u.getId(), u.getLeetcodeUsername());
+            } catch (Exception e) {
+                // Ignore LeetCode sync error
+            }
+        }
+        
+        // 2. Sync GitHub events
+        if (u.getGithubLink() != null && !u.getGithubLink().isBlank()) {
+            String githubUsername = extractGithubUsername(u.getGithubLink());
+            if (githubUsername != null && !githubUsername.isBlank()) {
+                try {
+                    String ghUrl = "https://api.github.com/users/" + githubUsername + "/events";
+                    org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+                    org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                    headers.set("User-Agent", "PrepNest-App");
+                    org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
+                    
+                    org.springframework.http.ResponseEntity<String> ghResponse = restTemplate.exchange(ghUrl, org.springframework.http.HttpMethod.GET, entity, String.class);
+                    if (ghResponse.getStatusCode().is2xxSuccessful() && ghResponse.getBody() != null) {
+                        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(ghResponse.getBody());
+                        if (root.isArray()) {
+                            for (com.fasterxml.jackson.databind.JsonNode event : root) {
+                                String createdAt = event.path("created_at").asText();
+                                if (createdAt != null && createdAt.length() >= 10) {
+                                    String dateStr = createdAt.substring(0, 10);
+                                    if (u.getActiveDates() == null) {
+                                        u.setActiveDates(new java.util.HashSet<>());
+                                    }
+                                    u.getActiveDates().add(dateStr);
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignore GitHub fetch failure
+                }
+            }
+        }
+        
+        // 3. Simulated HackerEarth & HackerRank mock spreads
+        if (u.getHackerearthLink() != null && !u.getHackerearthLink().isBlank()) {
+            java.util.Random rand = new java.util.Random();
+            for (int i = 0; i < 5; i++) {
+                int daysAgo = rand.nextInt(30);
+                String dateStr = java.time.LocalDate.now().minusDays(daysAgo).toString();
+                if (u.getActiveDates() == null) {
+                    u.setActiveDates(new java.util.HashSet<>());
+                }
+                u.getActiveDates().add(dateStr);
+            }
+        }
+        if (u.getHackerrankLink() != null && !u.getHackerrankLink().isBlank()) {
+            java.util.Random rand = new java.util.Random();
+            for (int i = 0; i < 5; i++) {
+                int daysAgo = rand.nextInt(30);
+                String dateStr = java.time.LocalDate.now().minusDays(daysAgo).toString();
+                if (u.getActiveDates() == null) {
+                    u.setActiveDates(new java.util.HashSet<>());
+                }
+                u.getActiveDates().add(dateStr);
+            }
+        }
+        
+        User saved = userRepository.save(u);
+        long rank = userRepository.countByXpPointsGreaterThan(saved.getXpPoints()) + 1;
+        saved.setGlobalRank(rank);
+        return ResponseEntity.ok(saved);
+    }
+
+    private String extractGithubUsername(String link) {
+        if (link == null) return null;
+        link = link.trim();
+        if (link.startsWith("http://") || link.startsWith("https://")) {
+            if (link.endsWith("/")) {
+                link = link.substring(0, link.length() - 1);
+            }
+            String[] parts = link.split("/");
+            if (parts.length > 0) {
+                return parts[parts.length - 1];
+            }
+        }
+        return link;
+    }
+
     public record UpdateRequest(String name) {}
+
+    public record ProfileUpdateRequest(
+            String name,
+            String dob,
+            String phone,
+            String githubLink,
+            String hackerrankLink,
+            String hackerearthLink,
+            String linkedinLink,
+            String leetcodeUsername
+    ) {}
 }

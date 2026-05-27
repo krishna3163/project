@@ -76,6 +76,35 @@ export default function DashboardPage() {
     }
   }
 
+  // Generate date list for activity grid (last 18 weeks = 126 days)
+  const activeDatesSet = new Set<string>(freshUser?.activeDates || [])
+  const totalDays = 126
+  const dateBlocks: { dateStr: string; isActive: boolean; label: string }[] = []
+  const today = new Date()
+  const startDate = new Date()
+  startDate.setDate(today.getDate() - totalDays + 1)
+
+  for (let i = 0; i < totalDays; i++) {
+    const current = new Date(startDate)
+    current.setDate(startDate.getDate() + i)
+    const yyyy = current.getFullYear()
+    const mm = String(current.getMonth() + 1).padStart(2, '0')
+    const dd = String(current.getDate()).padStart(2, '0')
+    const dateStr = `${yyyy}-${mm}-${dd}`
+    const isActive = activeDatesSet.has(dateStr)
+
+    dateBlocks.push({
+      dateStr,
+      isActive,
+      label: current.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
+    })
+  }
+
+  const weeks: typeof dateBlocks[] = []
+  for (let i = 0; i < dateBlocks.length; i += 7) {
+    weeks.push(dateBlocks.slice(i, i + 7))
+  }
+
   const stats = snapshot ? [
     { label: 'Problems Solved', value: snapshot.dsaSolved, icon: Code2, color: '#6366f1', link: '/dsa' },
     { label: 'Avg Mock Score', value: `${snapshot.mockScoreAvg.toFixed(0)}%`, icon: Trophy, color: '#f59e0b', link: '/mock-tests' },
@@ -163,6 +192,52 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Unified Activity Grid Preview */}
+      <div className="card" style={{ marginBottom: 24, padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+            <Flame size={16} color="#ef4444" />
+            My Coding Consistency
+          </h3>
+          <Link to="/profile" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}>
+            Sync Links →
+          </Link>
+        </div>
+        <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 4, minWidth: 620, justifyContent: 'space-between' }}>
+            {weeks.map((week, wIdx) => (
+              <div key={wIdx} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {week.map((day) => (
+                  <div
+                    key={day.dateStr}
+                    title={`${day.label}: ${day.isActive ? 'Active Session logged!' : 'No activity logged'}`}
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 1.5,
+                      background: day.isActive
+                        ? 'linear-gradient(135deg, #10b981, #059669)'
+                        : 'rgba(255,255,255,0.05)',
+                      border: day.isActive ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.02)',
+                      transition: 'transform 0.15s ease',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.3)'
+                      e.currentTarget.style.zIndex = '10'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)'
+                      e.currentTarget.style.zIndex = 'auto'
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-4" style={{ marginBottom: 24 }}>

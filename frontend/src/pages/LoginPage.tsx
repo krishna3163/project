@@ -10,6 +10,9 @@ export default function LoginPage() {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
+  const params = new URLSearchParams(window.location.search)
+  const isConcurrent = params.get('concurrent') === 'true'
+
   const handleSendOtp = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email.trim()) return
@@ -98,6 +101,24 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="card" style={{ padding: 32 }}>
+          {isConcurrent && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              marginBottom: 20,
+              fontSize: 13,
+              color: '#f87171',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4
+            }}>
+              <strong style={{ color: '#ef4444' }}>⚠️ Security Alert</strong>
+              <span>You have been logged out because this account was logged in on another device! PrepNest enforces a 1 active device session policy.</span>
+            </div>
+          )}
           {step === 'email' ? (
             <>
               <div style={{ marginBottom: 24 }}>

@@ -56,6 +56,16 @@ public class User {
     private int leetcodeHardSolved = 0;
     private int leetcodeRanking = 0;
 
+    // Advanced Profile Information
+    private String dob;
+    private String phone;
+    private String githubLink;
+    private String hackerrankLink;
+    private String hackerearthLink;
+    private String linkedinLink;
+    private Set<String> activeDates = new HashSet<>();
+    private String activeSessionId;
+
     @org.springframework.data.annotation.Transient
     private long globalRank;
 }

@@ -190,13 +190,15 @@ public class EmailService {
             </div>
             """.formatted(name, testTitle, score, rank, badgeColor, badge);
 
+        String htmlWithQuote = injectQuote(html);
+
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
-            helper.setFrom(fromEmail);
+            helper.setFrom(fromEmail, "PrepNest (no-reply)");
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(html, true);
+            helper.setText(htmlWithQuote, true);
 
             // Attach PDF
             helper.addAttachment(pdfFilename, new org.springframework.core.io.ByteArrayResource(pdfData), "application/pdf");
@@ -209,19 +211,79 @@ public class EmailService {
         }
     }
 
+    @Async
+    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 2000, multiplier = 2))
+    public void sendWelcomeEmail(String to, String name) {
+        String subject = "🚀 Welcome to PrepNest! Let's Master DSA Together!";
+        String html = """
+            <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
+                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        border-radius:16px; color:#f1f5f9;">
+              <h1 style="color:#6366f1;">🚀 Welcome to PrepNest, %s!</h1>
+              <h2>Your Ultimate DSA & Mock Test Partner</h2>
+              <p style="color:#94a3b8; font-size:14px; line-height:1.6;">
+                We are thrilled to have you join our elite community of developers! PrepNest is built to help you track your learning journey, synchronize external submissions, compete on leaderboards, and excel in SDE interviews.
+              </p>
+              <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px; margin:24px 0;">
+                <h3 style="color:#60a5fa; margin-top:0;">Key Features You Can Explore:</h3>
+                <ul style="color:#cbd5e1; font-size:13px; line-height:1.8; padding-left:20px; margin-bottom:0;">
+                  <li><strong>DSA Tracker:</strong> Interactive DSA sheets spanning Arrays to Graphs.</li>
+                  <li><strong>Mock Arena:</strong> Take user contests and seed tests under practice or competition modes.</li>
+                  <li><strong>Aggregated Profiles:</strong> Sync your GitHub active pushes and LeetCode submissions onto a beautiful Contribution Calendar grid.</li>
+                  <li><strong>Single-Device Concurrency:</strong> Maintain session security automatically across devices.</li>
+                </ul>
+              </div>
+              <p style="color:#94a3b8; font-size:13px;">Get started today by syncing your LeetCode and GitHub profiles on your dashboard!</p>
+              <a href="%s/profile" style="display:inline-block; background:#6366f1; color:#fff;
+                 padding:12px 28px; border-radius:8px; text-decoration:none; font-weight:600;
+                 margin-top:16px;">Complete Your Profile</a>
+              <hr style="border-color:#334155; margin:24px 0;">
+              <p style="color:#64748b; font-size:12px;">© 2026 PrepNest by DSA Tracker</p>
+            </div>
+            """.formatted(name, frontendUrl);
+        sendHtml(to, subject, html);
+    }
+
     private void sendHtml(String to, String subject, String html) {
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
-            helper.setFrom(fromEmail);
+            helper.setFrom(fromEmail, "PrepNest (no-reply)");
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(html, true);
+            helper.setText(injectQuote(html), true);
             mailSender.send(msg);
             log.info("Email sent to: [REDACTED] subject: {}", subject);
-        } catch (MessagingException e) {
+        } catch (Exception e) {
             log.error("Failed to send email: {}", e.getMessage());
             throw new RuntimeException("Email send failed", e);
         }
+    }
+
+    private static final String[] QUOTES = {
+        "First, solve the problem. Then, write the code. — John Johnson",
+        "Make it work, make it right, make it fast. — Kent Beck",
+        "Clean code always looks like it was written by someone who cares. — Michael Feathers",
+        "The only way to learn a new programming language is by writing programs in it. — Dennis Ritchie",
+        "Talk is cheap. Show me the code. — Linus Torvalds",
+        "Consistency is the key to mastering Data Structures and Algorithms! — PrepNest Team",
+        "The best way to predict the future is to invent it. — Alan Kay"
+    };
+
+    private String injectQuote(String html) {
+        String quote = QUOTES[new java.util.Random().nextInt(QUOTES.length)];
+        String quoteBox = """
+            <div style="margin-top: 30px; padding: 16px; background: rgba(255,255,255,0.03); 
+                        border-left: 4px solid #6366f1; border-radius: 8px; font-style: italic; color: #cbd5e1;">
+                💡 <strong>Motivational Quote of the Day:</strong><br/>
+                "%s"
+            </div>
+            """.formatted(quote);
+
+        int bodyCloseIdx = html.lastIndexOf("</div>");
+        if (bodyCloseIdx != -1) {
+            return html.substring(0, bodyCloseIdx) + quoteBox + html.substring(bodyCloseIdx);
+        }
+        return html + quoteBox;
     }
 }
