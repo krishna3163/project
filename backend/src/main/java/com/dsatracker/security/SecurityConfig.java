@@ -57,8 +57,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,
                     "/api/contests/upcoming",
                     "/api/roadmaps/**",
+                    "/api/mock-tests/share/**",
                     "/actuator/health"
                 ).permitAll()
+                .requestMatchers("/ws-leaderboard/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
@@ -75,7 +77,7 @@ public class SecurityConfig {
                         "style-src 'self' https://fonts.googleapis.com; " +
                         "font-src 'self' https://fonts.gstatic.com; " +
                         "img-src 'self' data: https:; " +
-                        "connect-src 'self'; " +
+                        "connect-src 'self' ws: wss:; " +
                         "frame-ancestors 'none'; " +
                         "object-src 'none';"
                     )

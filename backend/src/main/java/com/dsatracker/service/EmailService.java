@@ -147,6 +147,68 @@ public class EmailService {
         sendHtml(to, subject, html);
     }
 
+    @Async
+    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 2000, multiplier = 2))
+    public void sendMockTestResultWithPdf(String to, String name, int score, int rank,
+                                          long totalUsers, String badge, String testTitle,
+                                          byte[] pdfData, String pdfFilename) {
+        String subject = "🎯 Your Mock Test Results & Report - " + testTitle;
+        String badgeColor = switch (badge) {
+            case "GOLD" -> "#f59e0b";
+            case "SILVER" -> "#94a3b8";
+            case "BRONZE" -> "#b45309";
+            default -> "#6366f1";
+        };
+        String html = """
+            <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
+                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        border-radius:16px; color:#f1f5f9;">
+              <h1 style="color:#6366f1;">🎯 PrepNest Test Report</h1>
+              <h2 style="color:#f1f5f9;">Congratulations, %s! 🎉</h2>
+              <p style="color:#94a3b8;">You have successfully completed <strong>%s</strong>.</p>
+              <div style="display:flex; gap:16px; margin:24px 0; flex-wrap:wrap;">
+                <div style="flex:1; background:#1e293b; border:1px solid #334155; border-radius:12px;
+                            padding:20px; text-align:center; min-width:120px;">
+                  <p style="color:#94a3b8; margin:0;">Score</p>
+                  <p style="font-size:36px; font-weight:700; color:#60a5fa; margin:8px 0;">%d</p>
+                </div>
+                <div style="flex:1; background:#1e293b; border:1px solid #334155; border-radius:12px;
+                            padding:20px; text-align:center; min-width:120px;">
+                  <p style="color:#94a3b8; margin:0;">Rank</p>
+                  <p style="font-size:36px; font-weight:700; color:#34d399; margin:8px 0;">#%d</p>
+                </div>
+                <div style="flex:1; background:#1e293b; border:1px solid #334155; border-radius:12px;
+                            padding:20px; text-align:center; min-width:120px;">
+                  <p style="color:#94a3b8; margin:0;">Badge</p>
+                  <p style="font-size:24px; font-weight:700; color:%s; margin:8px 0;">%s</p>
+                </div>
+              </div>
+              <p style="color:#94a3b8;">Your detailed candidate performance report has been compiled and is attached as a PDF file to this email.</p>
+              <p style="color:#94a3b8;">Keep up the hard work and continue honing your DSA skills on PrepNest!</p>
+              <hr style="border-color:#334155; margin:24px 0;">
+              <p style="color:#64748b; font-size:12px;">© 2026 PrepNest by DSA Tracker</p>
+            </div>
+            """.formatted(name, testTitle, score, rank, badgeColor, badge);
+
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(html, true);
+
+            // Attach PDF
+            helper.addAttachment(pdfFilename, new org.springframework.core.io.ByteArrayResource(pdfData), "application/pdf");
+
+            mailSender.send(msg);
+            log.info("Mock test results email with PDF report sent successfully to: [REDACTED]");
+        } catch (Exception e) {
+            log.error("Failed to send mock test email with PDF: {}", e.getMessage());
+            throw new RuntimeException("Email report dispatch failed", e);
+        }
+    }
+
     private void sendHtml(String to, String subject, String html) {
         try {
             MimeMessage msg = mailSender.createMimeMessage();

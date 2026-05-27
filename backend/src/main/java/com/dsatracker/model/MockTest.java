@@ -20,6 +20,10 @@ public class MockTest {
     private String id;
 
     private String title;
+    
+    private String description;
+    
+    private String type; // practice or competition
 
     private List<Question> questions = new ArrayList<>();
 
@@ -29,6 +33,20 @@ public class MockTest {
     private int duration; // minutes
 
     private int totalMarks;
+    
+    private int passingMarks;
+    
+    private String difficulty; // easy, medium, hard
+    
+    private List<String> topics = new ArrayList<>();
+    
+    private Instant startTime;
+    
+    private Instant endTime;
+    
+    private int participants;
+    
+    private boolean isActive = true;
 
     @CreatedDate
     private Instant createdAt;
@@ -38,8 +56,14 @@ public class MockTest {
     public static class Question {
         private String id;
         private String text;
+        private String type; // mcq, coding, subjective
         private List<String> options = new ArrayList<>();
-        private int correctOption; // 0-based index
+        private int correctOption; // 0-based index for MCQ
+        private String correctAnswer; // correct answer text/code
+        private String explanation;
+        private String boilerplate; // coding boilerplate
+        private List<String> testCases = new ArrayList<>(); // format: "[2,7,11,15],9 -> [0,1]"
         private int marks;
+        private String topic;
     }
 }
