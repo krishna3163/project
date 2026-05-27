@@ -55,4 +55,9 @@ public class DsaController {
         long count = dsaService.getSolvedCount(user.getId());
         return ResponseEntity.ok(java.util.Map.of("solvedCount", count));
     }
+
+    @GetMapping("/potd")
+    public ResponseEntity<DsaProblem> getProblemOfTheDay() {
+        return ResponseEntity.ok(dsaService.getProblemOfTheDay());
+    }
 }

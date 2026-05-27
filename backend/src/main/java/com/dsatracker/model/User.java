@@ -48,4 +48,14 @@ public class User {
     private int dailyStreak = 0;
     private Instant lastActiveDate;
     private Set<String> badges = new HashSet<>();
+
+    // LeetCode Integration
+    private String leetcodeUsername;
+    private int leetcodeEasySolved = 0;
+    private int leetcodeMediumSolved = 0;
+    private int leetcodeHardSolved = 0;
+    private int leetcodeRanking = 0;
+
+    @org.springframework.data.annotation.Transient
+    private long globalRank;
 }

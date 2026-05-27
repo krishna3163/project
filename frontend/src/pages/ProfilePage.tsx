@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../context/AuthContext'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { Star, Flame, Award, Edit2, Check } from 'lucide-react'
+import { Star, Flame, Award, Edit2, Check, Trophy } from 'lucide-react'
 
 export default function ProfilePage() {
   const { } = useAuth()
@@ -12,10 +12,15 @@ export default function ProfilePage() {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // LeetCode Integration State
+  const [leetcodeUsername, setLeetcodeUsername] = useState('')
+  const [syncing, setSyncing] = useState(false)
+
   useEffect(() => {
     api.get('/api/users/me').then(r => {
       setProfile(r.data)
       setName(r.data.name || '')
+      setLeetcodeUsername(r.data.leetcodeUsername || '')
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
@@ -28,6 +33,32 @@ export default function ProfilePage() {
       toast.success('Profile updated!')
     } catch { toast.error('Update failed') }
     finally { setSaving(false) }
+  }
+
+  const handleLinkLeetCode = async () => {
+    setSyncing(true)
+    try {
+      const res = await api.put('/api/users/leetcode', { leetcodeUsername })
+      setProfile(res.data)
+      toast.success('LeetCode account linked and synced!')
+    } catch {
+      toast.error('Failed to link LeetCode account. Check username.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleSyncLeetCode = async () => {
+    setSyncing(true)
+    try {
+      const res = await api.post('/api/users/leetcode/sync')
+      setProfile(res.data)
+      toast.success('LeetCode stats and questions synced successfully!')
+    } catch {
+      toast.error('Failed to sync LeetCode stats')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   if (loading) return <div className="page"><div className="skeleton" style={{ height: 400 }} /></div>
@@ -72,7 +103,7 @@ export default function ProfilePage() {
         )}
         <p style={{ color: '#64748b', fontSize: 14 }}>{profile?.email}</p>
 
-        {/* XP & Streak */}
+        {/* XP, Streak & Rank */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 24 }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
@@ -88,7 +119,91 @@ export default function ProfilePage() {
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>Day Streak</div>
           </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+              <Trophy size={18} color="#10b981" />
+              <span style={{ fontSize: 24, fontWeight: 800, color: '#10b981' }}>#{profile?.globalRank || 1}</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>Global Rank</div>
+          </div>
         </div>
+      </div>
+
+      {/* LeetCode Integration */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Star size={20} color="#ffa116" />
+            <h3 style={{ margin: 0 }}>LeetCode Integration</h3>
+          </div>
+          {profile?.leetcodeUsername && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleSyncLeetCode}
+              disabled={syncing}
+              id="btn-sync-leetcode"
+            >
+              {syncing ? 'Syncing...' : 'Sync Now 🔄'}
+            </button>
+          )}
+        </div>
+
+        {profile?.leetcodeUsername ? (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,161,22,0.06)', border: '1px solid rgba(255,161,22,0.15)', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 2 }}>Linked Account</div>
+                <a href={`https://leetcode.com/${profile.leetcodeUsername}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 16, fontWeight: 700, color: '#ffa116', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  @{profile.leetcodeUsername} 🔗
+                </a>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 2 }}>LeetCode Rank</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9' }}>
+                  #{profile.leetcodeRanking ? profile.leetcodeRanking.toLocaleString() : 'N/A'}
+                </div>
+              </div>
+            </div>
+
+            <h4 style={{ marginBottom: 12, fontSize: 14, color: '#94a3b8' }}>Solved Breakdown</h4>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {[
+                { label: 'Easy', count: profile.leetcodeEasySolved, color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+                { label: 'Medium', count: profile.leetcodeMediumSolved, color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
+                { label: 'Hard', count: profile.leetcodeHardSolved, color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
+              ].map(d => (
+                <div key={d.label} style={{ flex: 1, background: d.bg, border: `1px solid ${d.color}22`, borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: d.color, marginBottom: 2 }}>{d.count || 0}</div>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{d.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16 }}>
+              Link your LeetCode username to display your official solving statistics, global ranking, and automatically sync solved problems to award local XP!
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input
+                className="input"
+                placeholder="Enter LeetCode username..."
+                value={leetcodeUsername}
+                onChange={e => setLeetcodeUsername(e.target.value)}
+                style={{ flex: 1 }}
+                id="leetcode-username-input"
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleLinkLeetCode}
+                disabled={syncing || !leetcodeUsername.trim()}
+                id="btn-link-leetcode"
+              >
+                {syncing ? 'Linking...' : 'Link Account'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Badges */}

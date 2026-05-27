@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -41,8 +42,118 @@ public class DsaService {
     }
 
     /**
+     * Deterministically fetches a consistent Problem of the Day (POTD) based on date hash.
+     */
+    public DsaProblem getProblemOfTheDay() {
+        List<DsaProblem> all = dsaProblemRepository.findAll();
+        if (all.isEmpty()) return null;
+        String dateKey = java.time.LocalDate.now().toString(); // e.g. "2026-05-27"
+        int hash = dateKey.hashCode();
+        int index = Math.abs(hash) % all.size();
+        return all.get(index);
+    }
+
+    /**
+     * Syncs a user's LeetCode profile statistics and solved submissions via public GraphQL.
+     */
+    public User syncLeetCodeProfile(String userId, String leetcodeUsername) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (leetcodeUsername == null || leetcodeUsername.isBlank()) {
+            throw new IllegalArgumentException("LeetCode username cannot be empty");
+        }
+        user.setLeetcodeUsername(leetcodeUsername.trim());
+
+        try {
+            String url = "https://leetcode.com/graphql";
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+            // Single optimized GraphQL query for stats & recent solved submissions
+            String query = "{\"query\":\"query userLeetcodeInfo($username: String!) { " +
+                    "matchedUser(username: $username) { " +
+                        "profile { ranking } " +
+                        "submitStats { acSubmissionNum { difficulty count } } " +
+                    "} " +
+                    "recentAcSubmissionList(username: $username, limit: 100) { " +
+                        "titleSlug " +
+                    "} " +
+                    "}\",\"variables\":{\"username\":\"" + leetcodeUsername.trim() + "\"}}";
+
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("Content-Type", "application/json");
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(query, headers);
+
+            String response = restTemplate.postForObject(url, entity, String.class);
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response);
+            com.fasterxml.jackson.databind.JsonNode data = root.path("data");
+            com.fasterxml.jackson.databind.JsonNode matchedUser = data.path("matchedUser");
+
+            if (!matchedUser.isMissingNode() && !matchedUser.isNull()) {
+                int ranking = matchedUser.path("profile").path("ranking").asInt();
+                user.setLeetcodeRanking(ranking);
+
+                com.fasterxml.jackson.databind.JsonNode acSubmissions = matchedUser.path("submitStats").path("acSubmissionNum");
+                if (acSubmissions.isArray()) {
+                    for (com.fasterxml.jackson.databind.JsonNode node : acSubmissions) {
+                        String difficulty = node.path("difficulty").asText();
+                        int count = node.path("count").asInt();
+                        if ("Easy".equalsIgnoreCase(difficulty)) {
+                            user.setLeetcodeEasySolved(count);
+                        } else if ("Medium".equalsIgnoreCase(difficulty)) {
+                            user.setLeetcodeMediumSolved(count);
+                        } else if ("Hard".equalsIgnoreCase(difficulty)) {
+                            user.setLeetcodeHardSolved(count);
+                        }
+                    }
+                }
+            }
+
+            com.fasterxml.jackson.databind.JsonNode submissions = data.path("recentAcSubmissionList");
+            int newlySolvedCount = 0;
+            if (submissions.isArray() && submissions.size() > 0) {
+                List<DsaProblem> localProblems = dsaProblemRepository.findAll();
+                for (com.fasterxml.jackson.databind.JsonNode subNode : submissions) {
+                    String titleSlug = subNode.path("titleSlug").asText().toLowerCase().trim();
+                    if (titleSlug.isEmpty()) continue;
+
+                    String normalizedMatch = "/problems/" + titleSlug;
+                    for (DsaProblem problem : localProblems) {
+                        if (problem.getLeetcodeLink() != null) {
+                            String link = problem.getLeetcodeLink().toLowerCase().trim();
+                            if (link.contains(normalizedMatch) && !problem.getUserSolvedList().contains(userId)) {
+                                problem.getUserSolvedList().add(userId);
+                                dsaProblemRepository.save(problem);
+                                user.setXpPoints(user.getXpPoints() + 10);
+                                newlySolvedCount++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            user = userRepository.save(user);
+
+            if (newlySolvedCount > 0) {
+                Notification notif = new Notification();
+                notif.setUserId(userId);
+                notif.setType("CONGRATS");
+                notif.setMessage("🔄 Synced " + newlySolvedCount + " solved questions from LeetCode! +" + (newlySolvedCount * 10) + " XP 🎉");
+                notif.setCreatedAt(Instant.now());
+                notificationRepository.save(notif);
+                
+                checkDsaMilestone(userId);
+            }
+        } catch (Exception e) {
+            log.error("Failed to sync LeetCode profile: {}", e.getMessage());
+        }
+
+        return user;
+    }
+
+    /**
      * Mark a problem as solved by the user.
-     * Awards XP and checks milestones.
+     * Awards 30 XP if it's the POTD, else 10 XP. Checks milestones.
      */
     public DsaProblem markSolved(String problemId, String userId) {
         DsaProblem problem = dsaProblemRepository.findById(problemId)
@@ -50,8 +161,20 @@ public class DsaService {
         if (!problem.getUserSolvedList().contains(userId)) {
             problem.getUserSolvedList().add(userId);
             dsaProblemRepository.save(problem);
-            awardXp(userId, 10);
+
+            DsaProblem potd = getProblemOfTheDay();
+            int xpAwarded = (potd != null && potd.getId().equals(problemId)) ? 30 : 10;
+            awardXp(userId, xpAwarded);
             checkDsaMilestone(userId);
+
+            if (xpAwarded == 30) {
+                Notification notif = new Notification();
+                notif.setUserId(userId);
+                notif.setType("CONGRATS");
+                notif.setMessage("🔥 You solved the Problem of the Day! +30 XP! 🎉");
+                notif.setCreatedAt(Instant.now());
+                notificationRepository.save(notif);
+            }
         }
         return problem;
     }
@@ -74,16 +197,15 @@ public class DsaService {
             User user = userRepository.findById(userId).orElse(null);
             if (user == null) return;
             String achievement = count + " DSA Problems Solved! 🎉";
-            // Send congratulations email
             emailService.sendCongratulations(user.getEmail(), user.getName(), achievement);
-            // Create in-app notification
+
             Notification notif = new Notification();
             notif.setUserId(userId);
             notif.setType("CONGRATS");
             notif.setMessage("🏆 Milestone reached: " + achievement);
             notif.setCreatedAt(Instant.now());
             notificationRepository.save(notif);
-            // Award badge
+
             user.getBadges().add(count + "_PROBLEMS");
             user.setXpPoints(user.getXpPoints() + 100);
             userRepository.save(user);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth, api } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { Code2, Trophy, FileText, Briefcase, Zap, TrendingUp, Star, Flame } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface Snapshot {
   dsaSolved: number
@@ -24,15 +25,56 @@ export default function DashboardPage() {
   const [contests, setContests] = useState<Contest[]>([])
   const [loading, setLoading] = useState(true)
 
+  // LeetCode & POTD States
+  const [potd, setPotd] = useState<any>(null)
+  const [freshUser, setFreshUser] = useState<any>(null)
+  const [syncing, setSyncing] = useState(false)
+
   useEffect(() => {
     Promise.all([
       api.get('/api/progress/snapshot'),
       api.get('/api/contests/upcoming', { params: { size: 3 } }),
-    ]).then(([snap, cont]) => {
+      api.get('/api/dsa/potd'),
+      api.get('/api/users/me'),
+    ]).then(([snap, cont, potdRes, meRes]) => {
       setSnapshot(snap.data)
       setContests(cont.data.content || [])
+      setPotd(potdRes.data)
+      setFreshUser(meRes.data)
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
+
+  const handleSolvePotd = async () => {
+    if (!potd) return
+    try {
+      const res = await api.post(`/api/dsa/${potd.id}/solve`)
+      setPotd(res.data)
+      const [snap, me] = await Promise.all([
+        api.get('/api/progress/snapshot'),
+        api.get('/api/users/me')
+      ])
+      setSnapshot(snap.data)
+      setFreshUser(me.data)
+      toast.success('Awesome! Solved the Problem of the Day! +30 XP! 🔥')
+    } catch {
+      toast.error('Failed to solve problem')
+    }
+  }
+
+  const handleSyncDashboard = async () => {
+    setSyncing(true)
+    try {
+      const res = await api.post('/api/users/leetcode/sync')
+      setFreshUser(res.data)
+      const snap = await api.get('/api/progress/snapshot')
+      setSnapshot(snap.data)
+      toast.success('LeetCode stats and questions synced successfully! 🔄')
+    } catch {
+      toast.error('Failed to sync LeetCode stats')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const stats = snapshot ? [
     { label: 'Problems Solved', value: snapshot.dsaSolved, icon: Code2, color: '#6366f1', link: '/dsa' },
@@ -54,7 +96,7 @@ export default function DashboardPage() {
       <div style={{
         background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(34,211,238,0.08) 100%)',
         border: '1px solid rgba(99,102,241,0.2)',
-        borderRadius: 20, padding: '32px 36px', marginBottom: 32,
+        borderRadius: 20, padding: '32px 36px', marginBottom: 24,
         position: 'relative', overflow: 'hidden',
       }}>
         <div style={{
@@ -75,8 +117,55 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Problem of the Day */}
+      {potd && (
+        <div className="card" style={{
+          background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(99,102,241,0.05) 100%)',
+          border: '1px solid rgba(245,158,11,0.2)',
+          borderRadius: 16, padding: '24px 28px', marginBottom: 24,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20
+        }}>
+          <div style={{ flex: 1, minWidth: 280 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{
+                background: 'rgba(245,158,11,0.15)', color: '#f59e0b',
+                fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
+                display: 'inline-flex', alignItems: 'center', gap: 4
+              }}>
+                🎯 Problem of the Day
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
+                background: potd.difficulty === 'EASY' ? 'rgba(16,185,129,0.15)' : potd.difficulty === 'MEDIUM' ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
+                color: potd.difficulty === 'EASY' ? '#10b981' : potd.difficulty === 'MEDIUM' ? '#fbbf24' : '#ef4444',
+              }}>{potd.difficulty}</span>
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 8px 0', color: '#f1f5f9' }}>{potd.title}</h2>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {potd.tags?.slice(0, 3).map((t: string) => (
+                <span key={t} style={{ fontSize: 11, background: 'rgba(255,255,255,0.05)', color: '#94a3b8', padding: '2px 8px', borderRadius: 4 }}>{t}</span>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <a href={potd.leetcodeLink} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Solve on LeetCode 🔗
+            </a>
+            {potd.userSolvedList?.includes(user?.userId) ? (
+              <span style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, fontSize: 14 }}>
+                ✅ Completed (+30 XP)
+              </span>
+            ) : (
+              <button onClick={handleSolvePotd} className="btn btn-primary btn-sm" style={{ background: '#f59e0b', borderColor: '#d97706', color: '#fff' }} id="btn-solve-potd">
+                Mark as Solved 🎯
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats Grid */}
-      <div className="grid grid-4" style={{ marginBottom: 32 }}>
+      <div className="grid grid-4" style={{ marginBottom: 24 }}>
         {loading
           ? Array(4).fill(0).map((_, i) => (
               <div key={i} className="skeleton" style={{ height: 120 }} />
@@ -98,6 +187,78 @@ export default function DashboardPage() {
               </Link>
             ))
         }
+      </div>
+
+      {/* Platform & LeetCode Profile Row */}
+      <div className="grid grid-2" style={{ marginBottom: 32 }}>
+        {/* Local Platform Rank Card */}
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 20, background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(34,211,238,0.03))' }}>
+          <div style={{
+            width: 60, height: 60, borderRadius: '50%',
+            background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24
+          }}>🏆</div>
+          <div>
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 2 }}>Platform Global Rank</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#10b981' }}>
+              #{freshUser?.globalRank || 1}
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 12, color: '#94a3b8' }}>
+              <span>✨ {freshUser?.xpPoints || 0} Total XP</span>
+              <span>🔥 {freshUser?.dailyStreak || 0} Day Streak</span>
+            </div>
+          </div>
+        </div>
+
+        {/* LeetCode Profile Card */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {freshUser?.leetcodeUsername ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: '50%',
+                  background: 'rgba(255,161,22,0.1)', border: '1px solid rgba(255,161,22,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+                }}>⭐</div>
+                <div>
+                  <div style={{ fontSize: 13, color: '#64748b' }}>LeetCode Profile</div>
+                  <a href={`https://leetcode.com/${freshUser.leetcodeUsername}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 16, fontWeight: 700, color: '#ffa116', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    @{freshUser.leetcodeUsername} 🔗
+                  </a>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>Solved Counts</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', display: 'flex', gap: 6 }}>
+                    <span style={{ color: '#10b981' }}>{freshUser.leetcodeEasySolved}E</span>
+                    <span style={{ color: '#fbbf24' }}>{freshUser.leetcodeMediumSolved}M</span>
+                    <span style={{ color: '#ef4444' }}>{freshUser.leetcodeHardSolved}H</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSyncDashboard}
+                  disabled={syncing}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '6px 12px' }}
+                  id="btn-sync-dashboard"
+                >
+                  {syncing ? 'Syncing...' : 'Sync 🔄'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h4 style={{ margin: '0 0 4px 0' }}>Integrate LeetCode</h4>
+                <p style={{ color: '#64748b', fontSize: 12, margin: 0 }}>Sync your LeetCode solved questions to earn local XP automatically!</p>
+              </div>
+              <Link to="/profile" className="btn btn-primary btn-sm" style={{ background: '#ffa116', borderColor: '#d97706' }}>
+                Connect 🔗
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Upcoming Contests */}
