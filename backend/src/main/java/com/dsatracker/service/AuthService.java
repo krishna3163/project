@@ -1,0 +1,93 @@
+package com.dsatracker.service;
+
+import com.dsatracker.model.User;
+import com.dsatracker.repository.UserRepository;
+import com.dsatracker.security.JwtUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Authentication service: OTP generation/verification, JWT issuance.
+ *
+ * OTP Security:
+ * - 6-digit numeric OTP generated via SecureRandom (RandomStringUtils uses java.security.SecureRandom).
+ * - Stored in Redis with 5-minute TTL (key: otp:{email}).
+ * - Deleted immediately after successful verification.
+ * - OTP value never logged.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final EmailService emailService;
+    private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${app.otp.ttl-seconds}")
+    private long otpTtlSeconds;
+
+    /** Generates OTP, stores in Redis, sends email. */
+    public void sendOtp(String email) {
+        // Use cryptographically secure random numeric OTP
+        String otp = RandomStringUtils.secure().nextNumeric(6);
+        redisTemplate.opsForValue().set(otpKey(email), otp, otpTtlSeconds, TimeUnit.SECONDS);
+        emailService.sendOtp(email, otp);
+        log.info("OTP sent for email: [REDACTED]");
+    }
+
+    /** Verifies OTP; returns JWT tokens on success. */
+    public AuthResult verifyOtp(String email, String otp) {
+        String stored = redisTemplate.opsForValue().get(otpKey(email));
+        if (stored == null || !stored.equals(otp)) {
+            throw new IllegalArgumentException("Invalid or expired OTP");
+        }
+        // Delete OTP immediately after use (single-use)
+        redisTemplate.delete(otpKey(email));
+
+        User user = userRepository.findByEmail(email).orElseGet(() -> registerNewUser(email));
+        user.setEmailVerified(true);
+        user.setLastActiveDate(Instant.now());
+        userRepository.save(user);
+
+        String accessToken = jwtUtil.generateToken(user.getId());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+        return new AuthResult(accessToken, refreshToken, user.getId(), user.getName(), user.getEmail());
+    }
+
+    public AuthResult refreshToken(String refreshToken) {
+        if (!jwtUtil.validateToken(refreshToken)) {
+            throw new IllegalArgumentException("Invalid refresh token");
+        }
+        String userId = jwtUtil.extractUserId(refreshToken);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        String newAccess = jwtUtil.generateToken(userId);
+        return new AuthResult(newAccess, refreshToken, user.getId(), user.getName(), user.getEmail());
+    }
+
+    private User registerNewUser(String email) {
+        User u = new User();
+        u.setEmail(email);
+        u.setName(email.split("@")[0]); // default name from email prefix
+        u.setCreatedAt(Instant.now());
+        return userRepository.save(u);
+    }
+
+    private String otpKey(String email) {
+        return "otp:" + email.toLowerCase().trim();
+    }
+
+    public record AuthResult(String accessToken, String refreshToken,
+                             String userId, String name, String email) {}
+}
