@@ -163,6 +163,68 @@ public class UserController {
         return ResponseEntity.ok(saved);
     }
 
+    @PostMapping("/friends")
+    public ResponseEntity<User> addFriend(
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal User user) {
+        String friendUsername = body.get("leetcodeUsername");
+        if (friendUsername == null || friendUsername.isBlank()) {
+            throw new IllegalArgumentException("LeetCode username cannot be blank");
+        }
+        friendUsername = friendUsername.trim();
+        
+        User u = userRepository.findById(user.getId()).orElseThrow();
+        if (u.getLeetcodeFriends() == null) {
+            u.setLeetcodeFriends(new java.util.ArrayList<>());
+        }
+        
+        if (u.getLeetcodeFriends().size() >= 5) {
+            throw new IllegalStateException("You can compare at most 5 friends!");
+        }
+        
+        if (!u.getLeetcodeFriends().contains(friendUsername)) {
+            u.getLeetcodeFriends().add(friendUsername);
+            userRepository.save(u);
+        }
+        return ResponseEntity.ok(u);
+    }
+
+    @DeleteMapping("/friends/{username}")
+    public ResponseEntity<User> removeFriend(
+            @PathVariable String username,
+            @AuthenticationPrincipal User user) {
+        User u = userRepository.findById(user.getId()).orElseThrow();
+        if (u.getLeetcodeFriends() != null) {
+            u.getLeetcodeFriends().remove(username.trim());
+            userRepository.save(u);
+        }
+        return ResponseEntity.ok(u);
+    }
+
+    @GetMapping("/friends/compare")
+    public ResponseEntity<java.util.List<User>> compareFriends(@AuthenticationPrincipal User user) {
+        User u = userRepository.findById(user.getId()).orElseThrow();
+        java.util.List<User> compared = new java.util.ArrayList<>();
+        
+        long myRank = userRepository.countByXpPointsGreaterThan(u.getXpPoints()) + 1;
+        u.setGlobalRank(myRank);
+        compared.add(u);
+        
+        if (u.getLeetcodeFriends() != null) {
+            for (String friendUsername : u.getLeetcodeFriends()) {
+                try {
+                    User fStats = dsaService.getLeetcodeStatsOnly(friendUsername);
+                    if (fStats != null) {
+                        compared.add(fStats);
+                    }
+                } catch (Exception e) {
+                    // Ignore individual failure
+                }
+            }
+        }
+        return ResponseEntity.ok(compared);
+    }
+
     private String extractGithubUsername(String link) {
         if (link == null) return null;
         link = link.trim();

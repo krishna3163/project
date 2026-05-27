@@ -235,4 +235,68 @@ public class DsaService {
             userRepository.save(user);
         });
     }
+
+    public User getLeetcodeStatsOnly(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+        
+        java.util.Optional<User> dbUserOpt = userRepository.findByLeetcodeUsernameIgnoreCase(username.trim());
+        if (dbUserOpt.isPresent()) {
+            User registered = dbUserOpt.get();
+            long rank = userRepository.countByXpPointsGreaterThan(registered.getXpPoints()) + 1;
+            registered.setGlobalRank(rank);
+            return registered;
+        }
+
+        User guest = new User();
+        guest.setLeetcodeUsername(username.trim());
+        guest.setName(username.trim());
+        guest.setEmail("guest@leetcode.com");
+
+        try {
+            String url = "https://leetcode.com/graphql";
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+            String query = "{\"query\":\"query userLeetcodeInfo($username: String!) { " +
+                    "matchedUser(username: $username) { " +
+                        "profile { ranking } " +
+                        "submitStats { acSubmissionNum { difficulty count } } " +
+                    "} " +
+                    "}\",\"variables\":{\"username\":\"" + username.trim() + "\"}}";
+
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("Content-Type", "application/json");
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(query, headers);
+
+            String response = restTemplate.postForObject(url, entity, String.class);
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response);
+            com.fasterxml.jackson.databind.JsonNode data = root.path("data");
+            com.fasterxml.jackson.databind.JsonNode matchedUser = data.path("matchedUser");
+
+            if (!matchedUser.isMissingNode() && !matchedUser.isNull()) {
+                int ranking = matchedUser.path("profile").path("ranking").asInt();
+                guest.setLeetcodeRanking(ranking);
+
+                com.fasterxml.jackson.databind.JsonNode acSubmissions = matchedUser.path("submitStats").path("acSubmissionNum");
+                if (acSubmissions.isArray()) {
+                    for (com.fasterxml.jackson.databind.JsonNode node : acSubmissions) {
+                        String difficulty = node.path("difficulty").asText();
+                        int count = node.path("count").asInt();
+                        if ("Easy".equalsIgnoreCase(difficulty)) {
+                            guest.setLeetcodeEasySolved(count);
+                        } else if ("Medium".equalsIgnoreCase(difficulty)) {
+                            guest.setLeetcodeMediumSolved(count);
+                        } else if ("Hard".equalsIgnoreCase(difficulty)) {
+                            guest.setLeetcodeHardSolved(count);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to scrape guest LeetCode profile for friend compare: {}", e.getMessage());
+        }
+        return guest;
+    }
 }

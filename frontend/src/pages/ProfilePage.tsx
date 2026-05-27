@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { Star, Flame, Award, Edit2, Trophy, Github, Linkedin, Calendar, Phone, ShieldCheck, RefreshCw } from 'lucide-react'
+import { Star, Flame, Award, Edit2, Trophy, Github, Linkedin, Calendar, Phone, ShieldCheck, RefreshCw, Plus, Trash2, X, BarChart2, Users } from 'lucide-react'
 
 // PII Masking Helpers
 function maskPhone(p: string) {
@@ -37,8 +37,21 @@ export default function ProfilePage() {
   const [linkedinLink, setLinkedinLink] = useState('')
   const [leetcodeUsername, setLeetcodeUsername] = useState('')
 
+  // Contest History & Social Compare States
+  const [results, setResults] = useState<any[]>([])
+  const [tests, setTests] = useState<any[]>([])
+  const [friendsList, setFriendsList] = useState<any[]>([]) // fetches my profile [0] and friends [1..N]
+  const [newFriendUsername, setNewFriendUsername] = useState('')
+  const [addingFriend, setAddingFriend] = useState(false)
+  const [selectedFriend, setSelectedFriend] = useState<any>(null) // selected friend for side-by-side modal comparison
+
   useEffect(() => {
     fetchProfile()
+    fetchContestHistory()
+    fetchFriendsCompare()
+    api.get('/api/mock-tests', { params: { size: 100 } })
+      .then(r => setTests(r.data.content || []))
+      .catch(() => {})
   }, [])
 
   const fetchProfile = () => {
@@ -53,6 +66,18 @@ export default function ProfilePage() {
       setLinkedinLink(r.data.linkedinLink || '')
       setLeetcodeUsername(r.data.leetcodeUsername || '')
     }).catch(() => {}).finally(() => setLoading(false))
+  }
+
+  const fetchContestHistory = () => {
+    api.get('/api/mock-tests/my-results')
+      .then(r => setResults(r.data || []))
+      .catch(() => {})
+  }
+
+  const fetchFriendsCompare = () => {
+    api.get('/api/users/friends/compare')
+      .then(r => setFriendsList(r.data || []))
+      .catch(() => {})
   }
 
   const handleSaveProfile = async () => {
@@ -71,6 +96,7 @@ export default function ProfilePage() {
       setProfile(res.data)
       setEditing(false)
       toast.success('Profile details updated!')
+      fetchFriendsCompare() // refresh comparison list
     } catch {
       toast.error('Failed to update profile')
     } finally {
@@ -84,10 +110,36 @@ export default function ProfilePage() {
       const res = await api.post('/api/users/profile/sync')
       setProfile(res.data)
       toast.success('Activity synchronized from all coding platforms!')
+      fetchFriendsCompare()
     } catch {
       toast.error('Failed to sync coding platform activities')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleAddFriend = async () => {
+    if (!newFriendUsername.trim()) return
+    setAddingFriend(true)
+    try {
+      await api.post('/api/users/friends', { leetcodeUsername: newFriendUsername.trim() })
+      toast.success('Friend added successfully!')
+      setNewFriendUsername('')
+      fetchFriendsCompare()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to add friend')
+    } finally {
+      setAddingFriend(false)
+    }
+  }
+
+  const handleRemoveFriend = async (friendUsername: string) => {
+    try {
+      await api.delete(`/api/users/friends/${friendUsername}`)
+      toast.success('Friend removed!')
+      fetchFriendsCompare()
+    } catch {
+      toast.error('Failed to remove friend')
     }
   }
 
@@ -124,6 +176,10 @@ export default function ProfilePage() {
   for (let i = 0; i < dateBlocks.length; i += 7) {
     weeks.push(dateBlocks.slice(i, i + 7))
   }
+
+  // Split friends compare data: me is first item, friends are subsequent
+  const meProfile = friendsList[0] || profile
+  const friendsProfiles = friendsList.slice(1)
 
   return (
     <div className="page" style={{ maxWidth: 840, margin: '0 auto', paddingBottom: 60 }}>
@@ -211,7 +267,7 @@ export default function ProfilePage() {
                 {week.map((day) => (
                   <div
                     key={day.dateStr}
-                    title={`${day.label}: ${day.isActive ? 'Active Coding Session logged!' : 'No activity logged'}`}
+                    title={`${day.label}: ${day.isActive ? 'Active Session logged!' : 'No activity logged'}`}
                     style={{
                       width: 11,
                       height: 11,
@@ -375,7 +431,132 @@ export default function ProfilePage() {
       ) : (
         /* Read-Only Profile View */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Coding Statistics */}
+          
+          {/* Completed Contests / Test History */}
+          <div className="card">
+            <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
+              <Trophy size={18} color="#f59e0b" />
+              Completed Contests History
+            </h3>
+            {results.length === 0 ? (
+              <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontStyle: 'italic' }}>
+                You have not participated in any contests yet. Go to Mock Arena to take your first test!
+              </p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', color: '#64748b' }}>
+                      <th style={{ padding: '10px 8px' }}>Contest Name</th>
+                      <th style={{ padding: '10px 8px' }}>Score</th>
+                      <th style={{ padding: '10px 8px' }}>Global Rank</th>
+                      <th style={{ padding: '10px 8px' }}>Accuracy</th>
+                      <th style={{ padding: '10px 8px' }}>Badge</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map((res, i) => (
+                      <tr key={res.id || i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#cbd5e1' }}>
+                        <td style={{ padding: '12px 8px', fontWeight: 600 }}>{res.testId ? (tests.find((t: any) => t.id === res.testId)?.title || 'Contest MCQ Challenge') : 'Practice Contest'}</td>
+                        <td style={{ padding: '12px 8px', color: '#60a5fa' }}>{res.score} / {res.totalMarks}</td>
+                        <td style={{ padding: '12px 8px', color: '#34d399' }}>#{res.rank} <span style={{ fontSize: 11, color: '#64748b' }}>of {res.totalUsers}</span></td>
+                        <td style={{ padding: '12px 8px' }}>{(res.accuracy * 100).toFixed(0)}%</td>
+                        <td style={{ padding: '12px 8px', fontWeight: 700, color: res.badge === 'GOLD' ? '#f59e0b' : res.badge === 'SILVER' ? '#94a3b8' : res.badge === 'BRONZE' ? '#b45309' : '#818cf8' }}>
+                          🏆 {res.badge || 'PARTICIPANT'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Friends Comparison & LeetCode Compare Dashboard */}
+          <div className="card">
+            <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
+              <Users size={18} color="#818cf8" />
+              Compare Friends Dashboard (Max 5)
+            </h3>
+            
+            <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>
+              Compare coding solved metrics, streaking points, and mock test average ranks side-by-side with up to 5 LeetCode buddies.
+            </p>
+
+            {/* Add Friend Input Form */}
+            {friendsProfiles.length < 5 && (
+              <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                <input
+                  className="input"
+                  placeholder="Enter friend's LeetCode username..."
+                  value={newFriendUsername}
+                  onChange={e => setNewFriendUsername(e.target.value)}
+                  style={{ flex: 1 }}
+                  id="friend-username-input"
+                />
+                <button
+                  className="btn btn-primary"
+                  onClick={handleAddFriend}
+                  disabled={addingFriend || !newFriendUsername.trim()}
+                  id="btn-add-friend"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Plus size={16} /> Add Friend
+                </button>
+              </div>
+            )}
+
+            {/* Friends list with comparison actions */}
+            {friendsProfiles.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '16px 0', color: '#475569', fontSize: 13 }}>
+                No friends added yet. Enter their LeetCode username above to start comparing ranks!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {friendsProfiles.map((friend: any) => (
+                  <div
+                    key={friend.leetcodeUsername}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+                      borderRadius: 12, padding: '12px 16px'
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: '#f1f5f9' }}>@{friend.leetcodeUsername}</span>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        <span>📊 Easy: {friend.leetcodeEasySolved}</span>
+                        <span>Medium: {friend.leetcodeMediumSolved}</span>
+                        <span>Hard: {friend.leetcodeHardSolved}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setSelectedFriend(friend)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 12px' }}
+                        id={`btn-compare-${friend.leetcodeUsername}`}
+                      >
+                        <BarChart2 size={13} /> Compare 📊
+                      </button>
+                      <button
+                        className="btn-icon"
+                        onClick={() => handleRemoveFriend(friend.leetcodeUsername)}
+                        style={{ width: 32, height: 32, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}
+                        id={`btn-remove-${friend.leetcodeUsername}`}
+                        title="Remove Friend"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* LeetCode Integration */}
           {profile?.leetcodeUsername && (
             <div className="card">
               <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
@@ -509,6 +690,135 @@ export default function ProfilePage() {
                 <p style={{ margin: 0, fontSize: 13 }}>No achievements unlocked yet. Solve coding problems to earn badges!</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Friend Side-by-Side Comparison Modal */}
+      {selectedFriend && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(8, 12, 20, 0.85)', backdropFilter: 'blur(12px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100, padding: 20
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 24,
+            width: '100%', maxWidth: 640, padding: 32,
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', position: 'relative'
+          }}>
+            <button
+              onClick={() => setSelectedFriend(null)}
+              style={{
+                position: 'absolute', top: 20, right: 20,
+                background: 'rgba(255, 255, 255, 0.05)', border: 'none', borderRadius: '50%',
+                width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#94a3b8'
+              }}
+              id="btn-close-compare-modal"
+            >
+              <X size={16} />
+            </button>
+
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, color: '#818cf8' }}>
+              <BarChart2 size={22} />
+              LeetCode Side-by-Side Rank Comparison
+            </h2>
+            <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>Candidate comparison with friend @{selectedFriend.leetcodeUsername}</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+              {/* Me Column */}
+              <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 16, padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13 }}>
+                    ME
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: 14, color: '#f1f5f9' }}>{meProfile?.name || 'You'}</h4>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>@{meProfile?.leetcodeUsername || 'Not connected'}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Platform Rank</span>
+                    <strong style={{ color: '#10b981' }}>#{meProfile?.globalRank || 1}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Streak</span>
+                    <strong style={{ color: '#ef4444' }}>🔥 {meProfile?.dailyStreak || 0}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>LeetCode Rank</span>
+                    <strong style={{ color: '#ffa116' }}>#{meProfile?.leetcodeRanking ? meProfile.leetcodeRanking.toLocaleString() : 'N/A'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Easy Solved</span>
+                    <strong style={{ color: '#10b981' }}>{meProfile?.leetcodeEasySolved || 0}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Medium Solved</span>
+                    <strong style={{ color: '#fbbf24' }}>{meProfile?.leetcodeMediumSolved || 0}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Hard Solved</span>
+                    <strong style={{ color: '#ef4444' }}>{meProfile?.leetcodeHardSolved || 0}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Friend Column */}
+              <div style={{ background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 16, padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ffa116', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13 }}>
+                    FR
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: 14, color: '#f1f5f9' }}>{selectedFriend?.name || 'Friend'}</h4>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>@{selectedFriend?.leetcodeUsername}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Platform Rank</span>
+                    <strong style={{ color: '#10b981' }}>#{selectedFriend?.globalRank || 'Guest'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Streak</span>
+                    <strong style={{ color: '#ef4444' }}>🔥 {selectedFriend?.dailyStreak || 0}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>LeetCode Rank</span>
+                    <strong style={{ color: '#ffa116' }}>#{selectedFriend?.leetcodeRanking ? selectedFriend.leetcodeRanking.toLocaleString() : 'N/A'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Easy Solved</span>
+                    <strong style={{ color: '#10b981' }}>{selectedFriend?.leetcodeEasySolved || 0}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 6 }}>
+                    <span style={{ color: '#64748b' }}>Medium Solved</span>
+                    <strong style={{ color: '#fbbf24' }}>{selectedFriend?.leetcodeMediumSolved || 0}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Hard Solved</span>
+                    <strong style={{ color: '#ef4444' }}>{selectedFriend?.leetcodeHardSolved || 0}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setSelectedFriend(null)}
+                id="btn-close-compare"
+              >
+                Close Comparison
+              </button>
+            </div>
           </div>
         </div>
       )}

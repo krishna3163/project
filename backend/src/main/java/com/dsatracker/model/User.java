@@ -65,6 +65,7 @@ public class User {
     private String linkedinLink;
     private Set<String> activeDates = new HashSet<>();
     private String activeSessionId;
+    private java.util.List<String> leetcodeFriends = new java.util.ArrayList<>();
 
     @org.springframework.data.annotation.Transient
     private long globalRank;

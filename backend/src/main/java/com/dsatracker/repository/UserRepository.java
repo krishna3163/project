@@ -8,4 +8,5 @@ public interface UserRepository extends MongoRepository<User, String> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
     long countByXpPointsGreaterThan(int xpPoints);
+    Optional<User> findByLeetcodeUsernameIgnoreCase(String leetcodeUsername);
 }

@@ -116,6 +116,7 @@ public class EmailService {
             case "BRONZE" -> "#b45309";
             default -> "#6366f1";
         };
+        String calUrl = generateGoogleCalendarUrl(testTitle, "Practice session on mock contest " + testTitle + ". Score: " + score + "/" + totalUsers + ". Let's keep refining our skills!");
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
                         background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
@@ -140,10 +141,15 @@ public class EmailService {
                 </div>
               </div>
               <p style="color:#94a3b8;">Total participants: %d. Keep practicing!</p>
+              <div style="margin:24px 0; text-align:center;">
+                <a href="%s" style="display:inline-block; background:#0f9d58; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px; box-shadow: 0 4px 12px rgba(15,157,88,0.3);">
+                  📅 Add Next Practice to Google Calendar
+                </a>
+              </div>
               <hr style="border-color:#334155; margin:24px 0;">
               <p style="color:#64748b; font-size:12px;">© 2025 DSA Tracker Platform</p>
             </div>
-            """.formatted(testTitle, score, rank, badgeColor, badge, totalUsers);
+            """.formatted(testTitle, score, rank, badgeColor, badge, totalUsers, calUrl);
         sendHtml(to, subject, html);
     }
 
@@ -159,6 +165,7 @@ public class EmailService {
             case "BRONZE" -> "#b45309";
             default -> "#6366f1";
         };
+        String calUrl = generateGoogleCalendarUrl(testTitle, "Detailed analysis practice on PrepNest: " + testTitle + ". Solved score: " + score + ". Let's make it to the top leaderboard next!");
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
                         background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
@@ -185,10 +192,15 @@ public class EmailService {
               </div>
               <p style="color:#94a3b8;">Your detailed candidate performance report has been compiled and is attached as a PDF file to this email.</p>
               <p style="color:#94a3b8;">Keep up the hard work and continue honing your DSA skills on PrepNest!</p>
+              <div style="margin:24px 0; text-align:center;">
+                <a href="%s" style="display:inline-block; background:#0f9d58; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px; box-shadow: 0 4px 12px rgba(15,157,88,0.3);">
+                  📅 Add Next Practice to Google Calendar
+                </a>
+              </div>
               <hr style="border-color:#334155; margin:24px 0;">
               <p style="color:#64748b; font-size:12px;">© 2026 PrepNest by DSA Tracker</p>
             </div>
-            """.formatted(name, testTitle, score, rank, badgeColor, badge);
+            """.formatted(name, testTitle, score, rank, badgeColor, badge, calUrl);
 
         String htmlWithQuote = injectQuote(html);
 
@@ -285,5 +297,25 @@ public class EmailService {
             return html.substring(0, bodyCloseIdx) + quoteBox + html.substring(bodyCloseIdx);
         }
         return html + quoteBox;
+    }
+
+    private String generateGoogleCalendarUrl(String title, String details) {
+        try {
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
+                    .withZone(java.time.ZoneOffset.UTC);
+            java.time.Instant start = java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.DAYS);
+            java.time.Instant end = start.plus(1, java.time.temporal.ChronoUnit.HOURS);
+            
+            String startStr = fmt.format(start);
+            String endStr = fmt.format(end);
+            
+            return "https://www.google.com/calendar/render?action=TEMPLATE&text="
+                    + java.net.URLEncoder.encode("PrepNest Mock Arena: " + title, "UTF-8")
+                    + "&dates=" + startStr + "/" + endStr
+                    + "&details=" + java.net.URLEncoder.encode(details, "UTF-8")
+                    + "&location=" + java.net.URLEncoder.encode("https://prepnest.com/mock-arena", "UTF-8");
+        } catch (Exception e) {
+            return "https://calendar.google.com";
+        }
     }
 }

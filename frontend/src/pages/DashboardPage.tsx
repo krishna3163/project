@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth, api } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
-import { Code2, Trophy, FileText, Briefcase, Zap, TrendingUp, Star, Flame } from 'lucide-react'
+import { Code2, Trophy, FileText, Briefcase, TrendingUp, Star, Flame } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Snapshot {
@@ -24,6 +24,8 @@ export default function DashboardPage() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [contests, setContests] = useState<Contest[]>([])
   const [loading, setLoading] = useState(true)
+  const [mockTests, setMockTests] = useState<any[]>([])
+  const [contestTab, setContestTab] = useState<'recent' | 'top' | 'upcoming'>('recent')
 
   // LeetCode & POTD States
   const [potd, setPotd] = useState<any>(null)
@@ -33,14 +35,16 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       api.get('/api/progress/snapshot'),
-      api.get('/api/contests/upcoming', { params: { size: 3 } }),
+      api.get('/api/contests/upcoming', { params: { size: 4 } }),
       api.get('/api/dsa/potd'),
       api.get('/api/users/me'),
-    ]).then(([snap, cont, potdRes, meRes]) => {
+      api.get('/api/mock-tests', { params: { size: 20 } }),
+    ]).then(([snap, cont, potdRes, meRes, mockRes]) => {
       setSnapshot(snap.data)
       setContests(cont.data.content || [])
       setPotd(potdRes.data)
       setFreshUser(meRes.data)
+      setMockTests(mockRes.data.content || [])
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
@@ -104,6 +108,9 @@ export default function DashboardPage() {
   for (let i = 0; i < dateBlocks.length; i += 7) {
     weeks.push(dateBlocks.slice(i, i + 7))
   }
+
+  const recentMockTests = [...mockTests].slice(0, 4)
+  const topMockTests = [...mockTests].sort((a, b) => (b.participants || 0) - (a.participants || 0)).slice(0, 4)
 
   const stats = snapshot ? [
     { label: 'Problems Solved', value: snapshot.dsaSolved, icon: Code2, color: '#6366f1', link: '/dsa' },
@@ -336,51 +343,134 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Upcoming Contests */}
+      {/* Contests Arena */}
       <div className="grid grid-2" style={{ marginBottom: 32 }}>
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <Zap size={20} color="#f59e0b" />
-            <h3>Upcoming Contests</h3>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', minHeight: 380 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Trophy size={20} color="#f59e0b" />
+              Contests Arena
+            </h3>
+            {/* Contest tab switchers */}
+            <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.2)', padding: 3, borderRadius: 8 }}>
+              {[
+                { id: 'recent', label: 'Recent' },
+                { id: 'top', label: 'Top Rated' },
+                { id: 'upcoming', label: 'Upcoming' }
+              ].map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setContestTab(t.id as any)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    background: contestTab === t.id ? '#6366f1' : 'transparent',
+                    color: contestTab === t.id ? '#fff' : '#64748b',
+                    transition: 'all 0.15s'
+                  }}
+                  id={`tab-dashboard-contest-${t.id}`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
+
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 64 }} />)}
+              {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 60 }} />)}
             </div>
-          ) : contests.length === 0 ? (
-            <p style={{ color: '#64748b', fontSize: 14 }}>No upcoming contests at the moment.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {contests.map(c => (
-                <a key={c.id} href={c.url} target="_blank" rel="noopener noreferrer"
-                  style={{
-                    display: 'block', textDecoration: 'none',
-                    background: 'rgba(99,102,241,0.08)',
-                    border: '1px solid rgba(99,102,241,0.15)',
-                    borderRadius: 12, padding: '14px 16px',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)')}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', marginBottom: 4 }}>{c.name}</div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>
-                        {new Date(c.startTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+              {contestTab === 'upcoming' && (
+                contests.length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>No upcoming platform contests logged.</p>
+                ) : (
+                  contests.slice(0, 4).map(c => (
+                    <a key={c.id} href={c.url} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        display: 'block', textDecoration: 'none',
+                        background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)',
+                        borderRadius: 10, padding: '12px 14px', transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)')}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 2 }}>{c.name}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>
+                            {new Date(c.startTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                          background: `${platformColors[c.platform] || '#6366f1'}15`,
+                          color: platformColors[c.platform] || '#818cf8',
+                        }}>{c.platform}</span>
                       </div>
+                    </a>
+                  ))
+                )
+              )}
+
+              {contestTab === 'recent' && (
+                recentMockTests.length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>No contests available.</p>
+                ) : (
+                  recentMockTests.map((t: any) => (
+                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, padding: '12px 14px' }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 2 }}>{t.title}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', display: 'flex', gap: 10 }}>
+                          <span>⏱ {t.duration} min</span>
+                          <span>🏆 {t.totalMarks} pts</span>
+                          <span style={{ color: t.difficulty === 'Easy' ? '#10b981' : t.difficulty === 'Hard' ? '#ef4444' : '#fbbf24' }}>
+                            {t.difficulty}
+                          </span>
+                        </div>
+                      </div>
+                      <Link to={`/mock-tests/${t.id}`} className="btn btn-primary btn-sm" style={{ padding: '6px 12px', fontSize: 11, borderRadius: 8 }}>
+                        Start 🧭
+                      </Link>
                     </div>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
-                      background: `${platformColors[c.platform] || '#6366f1'}22`,
-                      color: platformColors[c.platform] || '#818cf8',
-                    }}>{c.platform}</span>
-                  </div>
-                </a>
-              ))}
-              <Link to="/contests" className="btn btn-secondary btn-sm" style={{ textAlign: 'center', justifyContent: 'center' }}>
-                View All Contests →
-              </Link>
+                  ))
+                )
+              )}
+
+              {contestTab === 'top' && (
+                topMockTests.length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>No top contests available.</p>
+                ) : (
+                  topMockTests.map((t: any) => (
+                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, padding: '12px 14px' }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 2 }}>{t.title}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', display: 'flex', gap: 10 }}>
+                          <span>👥 {t.participants || 0} participants</span>
+                          <span>⏱ {t.duration} min</span>
+                          <span style={{ color: t.difficulty === 'Easy' ? '#10b981' : t.difficulty === 'Hard' ? '#ef4444' : '#fbbf24' }}>
+                            {t.difficulty}
+                          </span>
+                        </div>
+                      </div>
+                      <Link to={`/mock-tests/${t.id}`} className="btn btn-primary btn-sm" style={{ padding: '6px 12px', fontSize: 11, borderRadius: 8 }}>
+                        Start 🧭
+                      </Link>
+                    </div>
+                  ))
+                )
+              )}
+
+              {contestTab === 'upcoming' && contests.length > 0 && (
+                <Link to="/contests" className="btn btn-secondary btn-sm" style={{ textAlign: 'center', justifyContent: 'center', marginTop: 'auto', fontSize: 11, padding: 8 }}>
+                  View All Platform Contests →
+                </Link>
+              )}
+              {contestTab !== 'upcoming' && mockTests.length > 0 && (
+                <Link to="/mock-tests" className="btn btn-secondary btn-sm" style={{ textAlign: 'center', justifyContent: 'center', marginTop: 'auto', fontSize: 11, padding: 8 }}>
+                  Enter Mock Arena →
+                </Link>
+              )}
             </div>
           )}
         </div>
