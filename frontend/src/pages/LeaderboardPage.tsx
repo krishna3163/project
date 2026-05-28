@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, useAuth } from '../context/AuthContext'
-import { Trophy, Medal, Star, Flame, Award } from 'lucide-react'
+import { Trophy, Medal, Flame, Award } from 'lucide-react'
 
 interface LeaderboardUser {
   id: string

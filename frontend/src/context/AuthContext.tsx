@@ -59,6 +59,7 @@ interface AuthUser {
   userId: string
   name: string
   email: string
+  roles?: string[]
 }
 
 interface AuthContextType {
@@ -87,7 +88,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
           _accessToken = res.data.accessToken
           // Read user profile details to populate name, email
           const meRes = await api.get('/api/users/me')
-          setUser({ userId: meRes.data.id, name: meRes.data.name, email: meRes.data.email })
+          setUser({ userId: meRes.data.id, name: meRes.data.name, email: meRes.data.email, roles: meRes.data.roles })
         } catch (err) {
           clearTokens()
           document.cookie = "refresh_token=;path=/;max-age=0"
@@ -114,7 +115,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
       _accessToken = res.data.accessToken
       _refreshToken = res.data.refreshToken
       document.cookie = `refresh_token=${res.data.refreshToken};path=/;max-age=2592000;SameSite=Lax`
-      setUser({ userId: res.data.userId, name: res.data.name, email: res.data.email })
+      const meRes = await api.get('/api/users/me')
+      setUser({ userId: meRes.data.id, name: meRes.data.name, email: meRes.data.email, roles: meRes.data.roles })
     } finally {
       setLoading(false)
     }
