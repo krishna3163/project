@@ -61,21 +61,8 @@ export default function LoginPage() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: 24,
-      background: 'radial-gradient(ellipse at 30% 30%, rgba(99,102,241,0.12) 0%, transparent 60%), radial-gradient(ellipse at 70% 70%, rgba(34,211,238,0.08) 0%, transparent 60%), #080c14',
+      background: '#000000',
     }}>
-      {/* Floating orbs */}
-      <div style={{
-        position: 'fixed', top: '10%', left: '5%',
-        width: 300, height: 300, borderRadius: '50%',
-        background: 'rgba(99,102,241,0.05)', filter: 'blur(80px)',
-        pointerEvents: 'none', animation: 'float 6s ease-in-out infinite',
-      }} />
-      <div style={{
-        position: 'fixed', bottom: '10%', right: '5%',
-        width: 400, height: 400, borderRadius: '50%',
-        background: 'rgba(34,211,238,0.04)', filter: 'blur(100px)',
-        pointerEvents: 'none', animation: 'float 8s ease-in-out infinite reverse',
-      }} />
 
       <div style={{ width: '100%', maxWidth: 440 }} className="fade-in">
         {/* Logo */}

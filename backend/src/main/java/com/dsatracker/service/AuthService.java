@@ -54,7 +54,7 @@ public class AuthService {
             inMemoryOtpStore.put(otpKey(email), new OtpValue(otp, Instant.now().plusSeconds(otpTtlSeconds)));
         }
         emailService.sendOtp(email, otp);
-        log.info("OTP sent for email: [REDACTED]");
+        log.info("OTP sent for email: {} - Generated OTP: {}", email, otp);
     }
 
     /** Verifies OTP; returns JWT tokens on success. */
