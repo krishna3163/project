@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="frontend/public/logo.png" alt="Nano Banana Logo" width="120"/>
+  <img src="frontend/public/logo.png" alt="PrepNest Logo" width="120"/>
   
   # 🚀 PrepNest: The Ultimate DSA, Career & Gamified Tracker
   
