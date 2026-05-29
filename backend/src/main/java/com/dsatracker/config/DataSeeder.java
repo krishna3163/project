@@ -78,7 +78,8 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedRoadmaps() {
-        if (roadmapRepository.count() > 0) return;
+        // Drop existing roadmaps to migrate the schema from old format
+        roadmapRepository.deleteAll();
         log.info("Seeding roadmaps...");
         roadmapRepository.saveAll(List.of(
             buildRoadmap("Google"),

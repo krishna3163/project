@@ -41,8 +41,7 @@ public class ContestService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
 
-    /** Fetch upcoming contests (cached in Redis for 1 hour). */
-    @Cacheable(value = "contests:upcoming")
+    /** Fetch upcoming contests. */
     public Page<Contest> getUpcoming(Pageable pageable) {
         return contestRepository.findByStartTimeAfterOrderByStartTimeAsc(Instant.now(), pageable);
     }
@@ -52,7 +51,6 @@ public class ContestService {
      * The cron expression runs at minute 0 of every 6th hour.
      */
     @Scheduled(cron = "0 0 */6 * * *")
-    @CacheEvict(value = "contests:upcoming", allEntries = true)
     public void fetchContests() {
         log.info("Fetching contests from external APIs...");
         fetchHackerRankContests();
