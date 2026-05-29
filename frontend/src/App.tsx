@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import DsaTrackerPage from './pages/DsaTrackerPage'
@@ -15,6 +16,10 @@ import ProfilePage from './pages/ProfilePage'
 import NotificationsPage from './pages/NotificationsPage'
 import AdminPage from './pages/AdminPage'
 import LeaderboardPage from './pages/LeaderboardPage'
+import MockInterviewPage from './pages/MockInterviewPage'
+import RevisionPage from './pages/RevisionPage'
+import CompanySprintPage from './pages/CompanySprintPage'
+import NotFoundPage from './pages/NotFoundPage'
 
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
   const { user, loading } = useAuth()
@@ -46,6 +51,8 @@ function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="dsa" element={<DsaTrackerPage />} />
+        <Route path="revisions" element={<RevisionPage />} />
+        <Route path="sprints" element={<CompanySprintPage />} />
         <Route path="mock-tests" element={<MockTestsPage />} />
         <Route path="mock-tests/:id" element={<MockTestDetailPage />} />
         <Route path="notes" element={<NotesPage />} />
@@ -56,17 +63,22 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="leaderboard" element={<LeaderboardPage />} />
+        <Route path="interviews" element={<MockInterviewPage />} />
         <Route path="admin" element={<AdminPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <div className="app-startup">
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ErrorBoundary>
+    </div>
   )
 }

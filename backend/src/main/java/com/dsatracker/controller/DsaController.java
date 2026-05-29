@@ -36,6 +36,11 @@ public class DsaController {
         return ResponseEntity.ok(dsaService.getAll(pageable));
     }
 
+    @GetMapping("/{problemId}")
+    public ResponseEntity<DsaProblem> getById(@PathVariable String problemId) {
+        return ResponseEntity.ok(dsaService.getById(problemId));
+    }
+
     @PostMapping("/{problemId}/solve")
     public ResponseEntity<DsaProblem> markSolved(
             @PathVariable String problemId,

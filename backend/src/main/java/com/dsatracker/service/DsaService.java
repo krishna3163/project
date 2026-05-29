@@ -9,8 +9,12 @@ import com.dsatracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +28,8 @@ public class DsaService {
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     public Page<DsaProblem> getAll(Pageable pageable) {
         return dsaProblemRepository.findAll(pageable);
@@ -43,14 +49,16 @@ public class DsaService {
 
     /**
      * Deterministically fetches a consistent Problem of the Day (POTD) based on date hash.
+     * Uses pagination to avoid loading all database records into memory.
      */
     public DsaProblem getProblemOfTheDay() {
-        List<DsaProblem> all = dsaProblemRepository.findAll();
-        if (all.isEmpty()) return null;
+        long count = dsaProblemRepository.count();
+        if (count == 0) return null;
         String dateKey = java.time.LocalDate.now().toString(); // e.g. "2026-05-27"
         int hash = dateKey.hashCode();
-        int index = Math.abs(hash) % all.size();
-        return all.get(index);
+        int index = Math.abs(hash) % (int) count;
+        Page<DsaProblem> page = dsaProblemRepository.findAll(PageRequest.of(index, 1));
+        return page.getContent().isEmpty() ? null : page.getContent().get(0);
     }
 
     /**
@@ -66,11 +74,10 @@ public class DsaService {
 
         try {
             String url = "https://leetcode.com/graphql";
-            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
             // Single optimized GraphQL query for stats & recent solved submissions
-            String query = "{\"query\":\"query userLeetcodeInfo($username: String!) { " +
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("query", "query userLeetcodeInfo($username: String!) { " +
                     "matchedUser(username: $username) { " +
                         "profile { ranking } " +
                         "submitStats { acSubmissionNum { difficulty count } } " +
@@ -78,24 +85,29 @@ public class DsaService {
                     "recentAcSubmissionList(username: $username, limit: 100) { " +
                         "titleSlug timestamp " +
                     "} " +
-                    "}\",\"variables\":{\"username\":\"" + leetcodeUsername.trim() + "\"}}";
+                    "}");
+            java.util.Map<String, String> variables = new java.util.HashMap<>();
+            variables.put("username", leetcodeUsername.trim());
+            payload.put("variables", variables);
+
+            String requestBody = objectMapper.writeValueAsString(payload);
 
             org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
             headers.set("Content-Type", "application/json");
-            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(query, headers);
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(requestBody, headers);
 
             String response = restTemplate.postForObject(url, entity, String.class);
-            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response);
-            com.fasterxml.jackson.databind.JsonNode data = root.path("data");
-            com.fasterxml.jackson.databind.JsonNode matchedUser = data.path("matchedUser");
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode data = root.path("data");
+            JsonNode matchedUser = data.path("matchedUser");
 
             if (!matchedUser.isMissingNode() && !matchedUser.isNull()) {
                 int ranking = matchedUser.path("profile").path("ranking").asInt();
                 user.setLeetcodeRanking(ranking);
 
-                com.fasterxml.jackson.databind.JsonNode acSubmissions = matchedUser.path("submitStats").path("acSubmissionNum");
+                JsonNode acSubmissions = matchedUser.path("submitStats").path("acSubmissionNum");
                 if (acSubmissions.isArray()) {
-                    for (com.fasterxml.jackson.databind.JsonNode node : acSubmissions) {
+                    for (JsonNode node : acSubmissions) {
                         String difficulty = node.path("difficulty").asText();
                         int count = node.path("count").asInt();
                         if ("Easy".equalsIgnoreCase(difficulty)) {
@@ -109,11 +121,32 @@ public class DsaService {
                 }
             }
 
-            com.fasterxml.jackson.databind.JsonNode submissions = data.path("recentAcSubmissionList");
+            JsonNode submissions = data.path("recentAcSubmissionList");
             int newlySolvedCount = 0;
             if (submissions.isArray() && submissions.size() > 0) {
                 List<DsaProblem> localProblems = dsaProblemRepository.findAll();
-                for (com.fasterxml.jackson.databind.JsonNode subNode : submissions) {
+                
+                // Pre-build lookup map: titleSlug -> DsaProblem to optimize matching from O(N*M) to O(N+M)
+                java.util.Map<String, DsaProblem> slugToProblemMap = new java.util.HashMap<>();
+                for (DsaProblem problem : localProblems) {
+                    if (problem.getLeetcodeLink() != null) {
+                        String link = problem.getLeetcodeLink().toLowerCase().trim();
+                        int problemsIdx = link.indexOf("/problems/");
+                        if (problemsIdx != -1) {
+                            String slugPart = link.substring(problemsIdx + 10);
+                            if (slugPart.endsWith("/")) {
+                                slugPart = slugPart.substring(0, slugPart.length() - 1);
+                            }
+                            int questionMarkIdx = slugPart.indexOf("?");
+                            if (questionMarkIdx != -1) {
+                                slugPart = slugPart.substring(0, questionMarkIdx);
+                            }
+                            slugToProblemMap.put(slugPart.toLowerCase().trim(), problem);
+                        }
+                    }
+                }
+
+                for (JsonNode subNode : submissions) {
                     String titleSlug = subNode.path("titleSlug").asText().toLowerCase().trim();
                     if (titleSlug.isEmpty()) continue;
 
@@ -122,9 +155,9 @@ public class DsaService {
                     if (timestamp > 0) {
                         try {
                             String dateStr = java.time.Instant.ofEpochSecond(timestamp)
-                                    .atZone(java.time.ZoneId.systemDefault())
-                                    .toLocalDate()
-                                    .toString();
+                                     .atZone(java.time.ZoneId.systemDefault())
+                                     .toLocalDate()
+                                     .toString();
                             if (user.getActiveDates() == null) {
                                 user.setActiveDates(new java.util.HashSet<>());
                             }
@@ -134,17 +167,12 @@ public class DsaService {
                         }
                     }
 
-                    String normalizedMatch = "/problems/" + titleSlug;
-                    for (DsaProblem problem : localProblems) {
-                        if (problem.getLeetcodeLink() != null) {
-                            String link = problem.getLeetcodeLink().toLowerCase().trim();
-                            if (link.contains(normalizedMatch) && !problem.getUserSolvedList().contains(userId)) {
-                                problem.getUserSolvedList().add(userId);
-                                dsaProblemRepository.save(problem);
-                                user.setXpPoints(user.getXpPoints() + 10);
-                                newlySolvedCount++;
-                            }
-                        }
+                    DsaProblem problem = slugToProblemMap.get(titleSlug);
+                    if (problem != null && !problem.getUserSolvedList().contains(userId)) {
+                        problem.getUserSolvedList().add(userId);
+                        dsaProblemRepository.save(problem);
+                        user.setXpPoints(user.getXpPoints() + 10);
+                        newlySolvedCount++;
                     }
                 }
             }
@@ -196,11 +224,23 @@ public class DsaService {
         return problem;
     }
 
+    /**
+     * Mark a problem as unsolved by the user.
+     * Reverses the XP awarded when the problem was solved to prevent exploit farming.
+     */
     public DsaProblem markUnsolved(String problemId, String userId) {
         DsaProblem problem = dsaProblemRepository.findById(problemId)
                 .orElseThrow(() -> new IllegalArgumentException("Problem not found"));
-        problem.getUserSolvedList().remove(userId);
-        return dsaProblemRepository.save(problem);
+        if (problem.getUserSolvedList().contains(userId)) {
+            problem.getUserSolvedList().remove(userId);
+            DsaProblem saved = dsaProblemRepository.save(problem);
+
+            DsaProblem potd = getProblemOfTheDay();
+            int xpDeducted = (potd != null && potd.getId().equals(problemId)) ? 30 : 10;
+            awardXp(userId, -xpDeducted);
+            return saved;
+        }
+        return problem;
     }
 
     public long getSolvedCount(String userId) {
@@ -231,7 +271,7 @@ public class DsaService {
 
     private void awardXp(String userId, int xp) {
         userRepository.findById(userId).ifPresent(user -> {
-            user.setXpPoints(user.getXpPoints() + xp);
+            user.setXpPoints(Math.max(0, user.getXpPoints() + xp));
             userRepository.save(user);
         });
     }
@@ -256,32 +296,36 @@ public class DsaService {
 
         try {
             String url = "https://leetcode.com/graphql";
-            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
-            String query = "{\"query\":\"query userLeetcodeInfo($username: String!) { " +
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("query", "query userLeetcodeInfo($username: String!) { " +
                     "matchedUser(username: $username) { " +
                         "profile { ranking } " +
                         "submitStats { acSubmissionNum { difficulty count } } " +
                     "} " +
-                    "}\",\"variables\":{\"username\":\"" + username.trim() + "\"}}";
+                    "}");
+            java.util.Map<String, String> variables = new java.util.HashMap<>();
+            variables.put("username", username.trim());
+            payload.put("variables", variables);
+
+            String requestBody = objectMapper.writeValueAsString(payload);
 
             org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
             headers.set("Content-Type", "application/json");
-            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(query, headers);
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(requestBody, headers);
 
             String response = restTemplate.postForObject(url, entity, String.class);
-            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response);
-            com.fasterxml.jackson.databind.JsonNode data = root.path("data");
-            com.fasterxml.jackson.databind.JsonNode matchedUser = data.path("matchedUser");
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode data = root.path("data");
+            JsonNode matchedUser = data.path("matchedUser");
 
             if (!matchedUser.isMissingNode() && !matchedUser.isNull()) {
                 int ranking = matchedUser.path("profile").path("ranking").asInt();
                 guest.setLeetcodeRanking(ranking);
 
-                com.fasterxml.jackson.databind.JsonNode acSubmissions = matchedUser.path("submitStats").path("acSubmissionNum");
+                JsonNode acSubmissions = matchedUser.path("submitStats").path("acSubmissionNum");
                 if (acSubmissions.isArray()) {
-                    for (com.fasterxml.jackson.databind.JsonNode node : acSubmissions) {
+                    for (JsonNode node : acSubmissions) {
                         String difficulty = node.path("difficulty").asText();
                         int count = node.path("count").asInt();
                         if ("Easy".equalsIgnoreCase(difficulty)) {
@@ -298,5 +342,10 @@ public class DsaService {
             log.error("Failed to scrape guest LeetCode profile for friend compare: {}", e.getMessage());
         }
         return guest;
+    }
+
+    public DsaProblem getById(String id) {
+        return dsaProblemRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Problem not found"));
     }
 }

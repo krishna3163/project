@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import { Star, Flame, Award, Edit2, Trophy, Github, Linkedin, Calendar, Phone, ShieldCheck, RefreshCw, Plus, Trash2, X, BarChart2, Users } from 'lucide-react'
+import { generateActivityGridDates } from '../utils/activityGrid'
 
 // PII Masking Helpers
 function maskPhone(p: string) {
@@ -151,13 +152,9 @@ export default function ProfilePage() {
   const activeDatesSet = new Set<string>(profile?.activeDates || [])
   const totalDays = 126
   const dateBlocks: { dateStr: string; isActive: boolean; label: string }[] = []
-  const today = new Date()
-  const startDate = new Date()
-  startDate.setDate(today.getDate() - totalDays + 1)
+  const gridDates = generateActivityGridDates(totalDays)
 
-  for (let i = 0; i < totalDays; i++) {
-    const current = new Date(startDate)
-    current.setDate(startDate.getDate() + i)
+  for (const current of gridDates) {
     const yyyy = current.getFullYear()
     const mm = String(current.getMonth() + 1).padStart(2, '0')
     const dd = String(current.getDate()).padStart(2, '0')
@@ -681,7 +678,7 @@ export default function ProfilePage() {
                     color: '#f59e0b', fontWeight: 600, fontSize: 12,
                     display: 'flex', alignItems: 'center', gap: 4,
                   }}>
-                    🏆 {b.replace('_', ' ')}
+                    🏆 {b.replace(/_/g, ' ')}
                   </div>
                 ))}
               </div>

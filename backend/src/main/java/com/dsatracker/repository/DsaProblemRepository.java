@@ -13,4 +13,7 @@ public interface DsaProblemRepository extends MongoRepository<DsaProblem, String
     Page<DsaProblem> findByTitleContainingIgnoreCase(String title, Pageable pageable);
     long countByUserSolvedListContaining(String userId);
     List<DsaProblem> findByUserSolvedListContaining(String userId);
+
+    @org.springframework.data.mongodb.repository.Aggregation(pipeline = { "{ $sample: { size: 1 } }" })
+    List<DsaProblem> findRandomProblem();
 }

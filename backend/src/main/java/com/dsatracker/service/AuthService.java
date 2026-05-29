@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -136,6 +137,13 @@ public class AuthService {
             log.error("Failed to send welcome email to {}: {}", saved.getEmail(), e.getMessage());
         }
         return saved;
+    }
+
+    @Scheduled(fixedRate = 5, timeUnit = TimeUnit.MINUTES)
+    public void cleanExpiredInMemoryOtps() {
+        log.info("Running scheduled clean-up task for expired in-memory OTPs...");
+        Instant now = Instant.now();
+        inMemoryOtpStore.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
     }
 
     private String otpKey(String email) {

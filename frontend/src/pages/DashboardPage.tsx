@@ -3,6 +3,7 @@ import { useAuth, api } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { Code2, Trophy, FileText, Briefcase, TrendingUp, Star, Flame } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { generateActivityGridDates } from '../utils/activityGrid'
 
 interface Snapshot {
   dsaSolved: number
@@ -36,32 +37,32 @@ export default function DashboardPage() {
     Promise.all([
       api.get('/api/progress/snapshot'),
       api.get('/api/contests/upcoming', { params: { size: 4 } }),
-      api.get('/api/dsa/potd'),
+      api.get('/api/daily-challenge/today').catch(() => ({ data: null })),
       api.get('/api/users/me'),
       api.get('/api/mock-tests', { params: { size: 20 } }),
-    ]).then(([snap, cont, potdRes, meRes, mockRes]) => {
+    ]).then(([snap, cont, dailyChRes, meRes, mockRes]) => {
       setSnapshot(snap.data)
       setContests(cont.data.content || [])
-      setPotd(potdRes.data)
+      setPotd(dailyChRes.data) // dailyChRes.data is { id, problem, completed, date }
       setFreshUser(meRes.data)
       setMockTests(mockRes.data.content || [])
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   const handleSolvePotd = async () => {
-    if (!potd) return
+    if (!potd || !potd.id) return
     try {
-      const res = await api.post(`/api/dsa/${potd.id}/solve`)
-      setPotd(res.data)
+      await api.post(`/api/daily-challenge/${potd.id}/complete`)
+      setPotd({ ...potd, completed: true })
       const [snap, me] = await Promise.all([
         api.get('/api/progress/snapshot'),
         api.get('/api/users/me')
       ])
       setSnapshot(snap.data)
       setFreshUser(me.data)
-      toast.success('Awesome! Solved the Problem of the Day! +30 XP! 🔥')
+      toast.success('Awesome! Solved the Daily Challenge! +100 XP! 🔥')
     } catch {
-      toast.error('Failed to solve problem')
+      toast.error('Failed to complete daily challenge')
     }
   }
 
@@ -84,13 +85,9 @@ export default function DashboardPage() {
   const activeDatesSet = new Set<string>(freshUser?.activeDates || [])
   const totalDays = 126
   const dateBlocks: { dateStr: string; isActive: boolean; label: string }[] = []
-  const today = new Date()
-  const startDate = new Date()
-  startDate.setDate(today.getDate() - totalDays + 1)
+  const gridDates = generateActivityGridDates(totalDays)
 
-  for (let i = 0; i < totalDays; i++) {
-    const current = new Date(startDate)
-    current.setDate(startDate.getDate() + i)
+  for (const current of gridDates) {
     const yyyy = current.getFullYear()
     const mm = String(current.getMonth() + 1).padStart(2, '0')
     const dd = String(current.getDate()).padStart(2, '0')
@@ -114,7 +111,7 @@ export default function DashboardPage() {
 
   const stats = snapshot ? [
     { label: 'Problems Solved', value: snapshot.dsaSolved, icon: Code2, color: '#6366f1', link: '/dsa' },
-    { label: 'Avg Mock Score', value: `${snapshot.mockScoreAvg.toFixed(0)}%`, icon: Trophy, color: '#f59e0b', link: '/mock-tests' },
+    { label: 'Avg Mock Score', value: `${(snapshot.mockScoreAvg ?? 0).toFixed(0)}%`, icon: Trophy, color: '#f59e0b', link: '/mock-tests' },
     { label: 'Notes Uploaded', value: snapshot.notesCount, icon: FileText, color: '#22d3ee', link: '/notes' },
     { label: 'Resume Score', value: `${snapshot.resumeScore}%`, icon: Briefcase, color: '#10b981', link: '/resume' },
   ] : []
@@ -170,28 +167,28 @@ export default function DashboardPage() {
                 fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
                 display: 'inline-flex', alignItems: 'center', gap: 4
               }}>
-                🎯 Problem of the Day
+                🎯 Daily Coding Challenge
               </span>
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
-                background: potd.difficulty === 'EASY' ? 'rgba(16,185,129,0.15)' : potd.difficulty === 'MEDIUM' ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
-                color: potd.difficulty === 'EASY' ? '#10b981' : potd.difficulty === 'MEDIUM' ? '#fbbf24' : '#ef4444',
-              }}>{potd.difficulty}</span>
+                background: potd.problem.difficulty === 'EASY' ? 'rgba(16,185,129,0.15)' : potd.problem.difficulty === 'MEDIUM' ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
+                color: potd.problem.difficulty === 'EASY' ? '#10b981' : potd.problem.difficulty === 'MEDIUM' ? '#fbbf24' : '#ef4444',
+              }}>{potd.problem.difficulty}</span>
             </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 8px 0', color: '#f1f5f9' }}>{potd.title}</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 8px 0', color: '#f1f5f9' }}>{potd.problem.title}</h2>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {potd.tags?.slice(0, 3).map((t: string) => (
+              {potd.problem.tags?.slice(0, 3).map((t: string) => (
                 <span key={t} style={{ fontSize: 11, background: 'rgba(255,255,255,0.05)', color: '#94a3b8', padding: '2px 8px', borderRadius: 4 }}>{t}</span>
               ))}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <a href={potd.leetcodeLink} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <a href={potd.problem.leetcodeLink} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               Solve on LeetCode 🔗
             </a>
-            {potd.userSolvedList?.includes(user?.userId) ? (
+            {potd.completed ? (
               <span style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, fontSize: 14 }}>
-                ✅ Completed (+30 XP)
+                ✅ Completed (+100 XP)
               </span>
             ) : (
               <button onClick={handleSolvePotd} className="btn btn-primary btn-sm" style={{ background: '#f59e0b', borderColor: '#d97706', color: '#fff' }} id="btn-solve-potd">

@@ -10,4 +10,5 @@ public interface UserRepository extends MongoRepository<User, String> {
     long countByXpPointsGreaterThan(int xpPoints);
     long countByActiveSessionIdIsNotNull();
     Optional<User> findByLeetcodeUsernameIgnoreCase(String leetcodeUsername);
+    java.util.List<User> findByLastActiveDateAfter(java.time.Instant date);
 }

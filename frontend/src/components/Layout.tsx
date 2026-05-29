@@ -3,18 +3,22 @@ import { useAuth, api } from '../context/AuthContext'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Code2, FileText, Briefcase,
-  Trophy, Map, BarChart3, User, Bell, LogOut, Menu, Zap, ShieldCheck, Medal
+  Trophy, Map, BarChart3, User, Bell, LogOut, Menu, Zap, ShieldCheck, Medal, Users,
+  Brain, Sparkles
 } from 'lucide-react'
 
 const navItems = [
   { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard'  },
   { to: '/dsa',        icon: Code2,            label: 'DSA Tracker' },
+  { to: '/revisions',   icon: Brain,            label: 'Revision Queue' },
+  { to: '/sprints',     icon: Sparkles,         label: 'Company Sprints' },
   { to: '/mock-tests', icon: Trophy,           label: 'Mock Tests'  },
   { to: '/notes',      icon: FileText,         label: 'Notes'       },
   { to: '/resume',     icon: Briefcase,        label: 'Resume'      },
   { to: '/contests',   icon: Zap,              label: 'Contests'    },
   { to: '/roadmaps',   icon: Map,              label: 'Roadmaps'    },
   { to: '/leaderboard',icon: Medal,            label: 'Leaderboard' },
+  { to: '/interviews', icon: Users,            label: 'Peer Interviews'},
   { to: '/progress',   icon: BarChart3,        label: 'Analytics'   },
   { to: '/profile',    icon: User,             label: 'Profile'     },
 ]
@@ -79,12 +83,10 @@ export default function Layout() {
         {/* Logo */}
         <div style={{ padding: '0 24px 24px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
+            <img src="/logo.png" alt="Logo" style={{
               width: 36, height: 36, borderRadius: 10,
-              background: 'linear-gradient(135deg, #6366f1, #22d3ee)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 800, color: '#fff'
-            }}>D</div>
+              objectFit: 'cover'
+            }} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, color: '#f1f5f9' }}>DSA Tracker</div>
               <div style={{ fontSize: 11, color: '#64748b' }}>Placement Ready</div>

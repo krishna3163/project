@@ -83,7 +83,10 @@ public class MockTestService {
         resultRepo.deleteAll(results);
         // Clean up Redis sessions for this test
         try {
-            redisTemplate.delete("session:*:" + testId);
+            Set<String> keys = redisTemplate.keys("session:*:" + testId);
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
         } catch (Exception e) {
             log.warn("Redis cleanup failed for test {}: {}", testId, e.getMessage());
         }
@@ -427,33 +430,36 @@ public class MockTestService {
 
     private int calculateStreak(List<MockResult> chronologicalResults) {
         if (chronologicalResults.isEmpty()) return 0;
-        int maxStreak = 1;
-        int currentStreak = 1;
         
-        Instant lastDay = chronologicalResults.get(0).getSubmittedAt().truncatedTo(ChronoUnit.DAYS);
-        for (int i = 1; i < chronologicalResults.size(); i++) {
-            Instant currentDay = chronologicalResults.get(i).getSubmittedAt().truncatedTo(ChronoUnit.DAYS);
-            long daysBetween = ChronoUnit.DAYS.between(lastDay, currentDay);
-            
-            if (daysBetween == 1) {
-                currentStreak++;
-                if (currentStreak > maxStreak) {
-                    maxStreak = currentStreak;
-                }
-            } else if (daysBetween > 1) {
-                currentStreak = 1;
-            }
-            lastDay = currentDay;
+        java.util.Set<java.time.LocalDate> submissionDates = new java.util.HashSet<>();
+        for (MockResult r : chronologicalResults) {
+            submissionDates.add(java.time.LocalDate.ofInstant(r.getSubmittedAt(), java.time.ZoneId.systemDefault()));
         }
-        return maxStreak;
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        int streak = 0;
+        
+        if (submissionDates.contains(today)) {
+            streak = 1;
+            java.time.LocalDate checkDate = today.minusDays(1);
+            while (submissionDates.contains(checkDate)) {
+                streak++;
+                checkDate = checkDate.minusDays(1);
+            }
+        } else if (submissionDates.contains(today.minusDays(1))) {
+            streak = 1;
+            java.time.LocalDate checkDate = today.minusDays(2);
+            while (submissionDates.contains(checkDate)) {
+                streak++;
+                checkDate = checkDate.minusDays(1);
+            }
+        }
+        
+        return streak;
     }
 
     public MockResult getResultByShareId(String shareId) {
-        // Query result directly using MongoDB template or filter resultRepo
-        // We will scan results for shareId (it's not indexed but typically small scale)
-        return resultRepo.findAll().stream()
-                .filter(r -> shareId.equals(r.getShareId()))
-                .findFirst()
+        return resultRepo.findByShareId(shareId)
                 .orElseThrow(() -> new IllegalArgumentException("Result share card not found"));
     }
 

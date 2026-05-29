@@ -25,6 +25,10 @@ public class DsaProblem {
 
     private List<String> tags = new ArrayList<>();
 
+    private List<String> companies = new ArrayList<>();
+
+    private int frequency = 0;
+
     private String solutionLink;
 
     private String leetcodeLink;

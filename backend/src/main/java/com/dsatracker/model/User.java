@@ -1,5 +1,6 @@
 package com.dsatracker.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -32,6 +33,7 @@ public class User {
     private String email;
 
     /** BCrypt-hashed password. Never store plaintext. */
+    @JsonIgnore
     private String password;
 
     private Set<String> roles = new HashSet<>(Set.of("ROLE_USER"));
@@ -47,9 +49,13 @@ public class User {
     private int xpPoints = 0;
     private int coins = 0;
     private int dailyStreak = 0;
+    private int maxStreak = 0;
     private Instant lastActiveDate;
     private Set<String> badges = new HashSet<>();
     private java.util.Map<String, Boolean> dailyQuests = new java.util.HashMap<>();
+
+    // Email preferences
+    private boolean contestRemindersEnabled = true;
 
     // LeetCode Integration
     private String leetcodeUsername;
@@ -66,6 +72,7 @@ public class User {
     private String hackerearthLink;
     private String linkedinLink;
     private Set<String> activeDates = new HashSet<>();
+    @JsonIgnore
     private String activeSessionId;
     private java.util.List<String> leetcodeFriends = new java.util.ArrayList<>();
 

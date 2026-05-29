@@ -31,17 +31,23 @@ api.interceptors.response.use(
   res => res,
   async error => {
     const original = error.config
-    if (error.response?.status === 401 && !original._retry && _refreshToken) {
-      original._retry = true
-      try {
-        const res = await axios.post(`${BASE}/api/auth/refresh`, { refreshToken: _refreshToken })
-        _accessToken = res.data.accessToken
-        original.headers.Authorization = `Bearer ${_accessToken}`
-        return api(original)
-      } catch {
+    if (error.response?.status === 401 && !original._retry) {
+      if (_refreshToken) {
+        original._retry = true
+        try {
+          const res = await axios.post(`${BASE}/api/auth/refresh`, { refreshToken: _refreshToken })
+          _accessToken = res.data.accessToken
+          original.headers.Authorization = `Bearer ${_accessToken}`
+          return api(original)
+        } catch {
+          clearTokens()
+          document.cookie = "refresh_token=;path=/;max-age=0"
+          globalThis.location.href = '/login?concurrent=true'
+        }
+      } else {
         clearTokens()
         document.cookie = "refresh_token=;path=/;max-age=0"
-        globalThis.location.href = '/login?concurrent=true'
+        globalThis.location.href = '/login'
       }
     }
     throw error
@@ -114,7 +120,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
       const res = await api.post('/api/auth/verify-otp', { email, otp })
       _accessToken = res.data.accessToken
       _refreshToken = res.data.refreshToken
-      document.cookie = `refresh_token=${res.data.refreshToken};path=/;max-age=2592000;SameSite=Lax`
+      document.cookie = `refresh_token=${res.data.refreshToken};path=/;max-age=2592000;SameSite=Lax;Secure`
       const meRes = await api.get('/api/users/me')
       setUser({ userId: meRes.data.id, name: meRes.data.name, email: meRes.data.email, roles: meRes.data.roles })
     } finally {

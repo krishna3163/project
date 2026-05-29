@@ -8,8 +8,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/users")
@@ -19,11 +27,21 @@ public class UserController {
     private final UserRepository userRepository;
     private final DsaService dsaService;
     private final QuestService questService;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    private final StringRedisTemplate redisTemplate;
 
     @GetMapping("/me")
     public ResponseEntity<User> getMe(@AuthenticationPrincipal User user) {
         User u = userRepository.findById(user.getId()).orElseThrow();
-        questService.initializeDailyQuests(u);
+        
+        // Cache daily quest initialization check in Redis with a 24-hour TTL to prevent redundant DB writes
+        String questCacheKey = "user:quests:init:" + u.getId() + ":" + java.time.LocalDate.now();
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(questCacheKey))) {
+            questService.initializeDailyQuests(u);
+            redisTemplate.opsForValue().set(questCacheKey, "true", 1, TimeUnit.DAYS);
+        }
+        
         long rank = userRepository.countByXpPointsGreaterThan(u.getXpPoints()) + 1;
         u.setGlobalRank(rank);
         return ResponseEntity.ok(u);
@@ -68,7 +86,7 @@ public class UserController {
 
     @PutMapping("/profile")
     public ResponseEntity<User> updateProfile(
-            @RequestBody ProfileUpdateRequest req,
+            @Valid @RequestBody ProfileUpdateRequest req,
             @AuthenticationPrincipal User user) {
         User u = userRepository.findById(user.getId()).orElseThrow();
         if (req.name() != null) u.setName(req.name().trim());
@@ -102,23 +120,21 @@ public class UserController {
             }
         }
         
-        // 2. Sync GitHub events
+        // 2. Sync GitHub events using our timeout-safe RestTemplate
         if (u.getGithubLink() != null && !u.getGithubLink().isBlank()) {
             String githubUsername = extractGithubUsername(u.getGithubLink());
             if (githubUsername != null && !githubUsername.isBlank()) {
                 try {
                     String ghUrl = "https://api.github.com/users/" + githubUsername + "/events";
-                    org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
                     org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
                     headers.set("User-Agent", "PrepNest-App");
                     org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
                     
                     org.springframework.http.ResponseEntity<String> ghResponse = restTemplate.exchange(ghUrl, org.springframework.http.HttpMethod.GET, entity, String.class);
                     if (ghResponse.getStatusCode().is2xxSuccessful() && ghResponse.getBody() != null) {
-                        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(ghResponse.getBody());
+                        JsonNode root = objectMapper.readTree(ghResponse.getBody());
                         if (root.isArray()) {
-                            for (com.fasterxml.jackson.databind.JsonNode event : root) {
+                            for (JsonNode event : root) {
                                 String createdAt = event.path("created_at").asText();
                                 if (createdAt != null && createdAt.length() >= 10) {
                                     String dateStr = createdAt.substring(0, 10);
@@ -136,29 +152,8 @@ public class UserController {
             }
         }
         
-        // 3. Simulated HackerEarth & HackerRank mock spreads
-        if (u.getHackerearthLink() != null && !u.getHackerearthLink().isBlank()) {
-            java.util.Random rand = new java.util.Random();
-            for (int i = 0; i < 5; i++) {
-                int daysAgo = rand.nextInt(30);
-                String dateStr = java.time.LocalDate.now().minusDays(daysAgo).toString();
-                if (u.getActiveDates() == null) {
-                    u.setActiveDates(new java.util.HashSet<>());
-                }
-                u.getActiveDates().add(dateStr);
-            }
-        }
-        if (u.getHackerrankLink() != null && !u.getHackerrankLink().isBlank()) {
-            java.util.Random rand = new java.util.Random();
-            for (int i = 0; i < 5; i++) {
-                int daysAgo = rand.nextInt(30);
-                String dateStr = java.time.LocalDate.now().minusDays(daysAgo).toString();
-                if (u.getActiveDates() == null) {
-                    u.setActiveDates(new java.util.HashSet<>());
-                }
-                u.getActiveDates().add(dateStr);
-            }
-        }
+        // 3. Removed simulated HackerEarth & HackerRank mock spreads to prevent data corruption.
+        // Third-party connections will remain authentic and display actual synced dates.
         
         User saved = userRepository.save(u);
         long rank = userRepository.countByXpPointsGreaterThan(saved.getXpPoints()) + 1;
@@ -246,13 +241,28 @@ public class UserController {
     public record UpdateRequest(String name) {}
 
     public record ProfileUpdateRequest(
+            @Size(max = 50, message = "Name must be less than 50 characters")
             String name,
+
+            @Pattern(regexp = "^$|^\\d{4}-\\d{2}-\\d{2}$", message = "Date of Birth must be in YYYY-MM-DD format")
             String dob,
+
+            @Pattern(regexp = "^$|^\\+?[0-9]{10,15}$", message = "Invalid phone number format")
             String phone,
+
+            @Pattern(regexp = "^$|^https?:\\/\\/(www\\.)?github\\.com\\/.*", message = "Invalid GitHub link")
             String githubLink,
+
+            @Pattern(regexp = "^$|^https?:\\/\\/(www\\.)?hackerrank\\.com\\/.*", message = "Invalid HackerRank link")
             String hackerrankLink,
+
+            @Pattern(regexp = "^$|^https?:\\/\\/(www\\.)?hackerearth\\.com\\/.*", message = "Invalid HackerEarth link")
             String hackerearthLink,
+
+            @Pattern(regexp = "^$|^https?:\\/\\/(www\\.)?linkedin\\.com\\/.*", message = "Invalid LinkedIn link")
             String linkedinLink,
+
+            @Size(max = 30, message = "LeetCode username must be less than 30 characters")
             String leetcodeUsername
     ) {}
 }

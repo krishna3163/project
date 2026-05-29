@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { Mail, Shield, ArrowRight, Loader2, Code2 } from 'lucide-react'
+import { Mail, Shield, ArrowRight, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const { sendOtp, verifyOtp, loading } = useAuth()
@@ -80,15 +80,12 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: 440 }} className="fade-in">
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{
+          <img src="/logo.png" alt="Logo" style={{
             width: 64, height: 64, borderRadius: 18,
-            background: 'linear-gradient(135deg, #6366f1, #22d3ee)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
             boxShadow: '0 0 40px rgba(99,102,241,0.4)',
-          }}>
-            <Code2 size={32} color="#fff" />
-          </div>
+            objectFit: 'cover'
+          }} />
           <h1 style={{
             fontSize: '2rem', fontWeight: 800,
             background: 'linear-gradient(135deg, #f1f5f9, #94a3b8)',

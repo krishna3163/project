@@ -43,6 +43,7 @@ export default function MockTestsPage() {
   const [createTopics, setCreateTopics] = useState('')
   const [createType, setCreateType] = useState('practice')
   const [inputStyle, setInputStyle] = useState<'manual' | 'json'>('manual')
+  const [isCreating, setIsCreating] = useState(false)
 
   // Manual Builder Questions State
   const [manualQuestions, setManualQuestions] = useState<any[]>([
@@ -137,8 +138,15 @@ export default function MockTestsPage() {
   }
 
   const handleCreateContest = async () => {
+    if (isCreating) return
+
     if (!createTitle.trim()) {
       toast.error('Please enter a contest title')
+      return
+    }
+
+    if (createDuration < 5) {
+      toast.error('Contest duration must be at least 5 minutes')
       return
     }
 
@@ -207,6 +215,7 @@ export default function MockTestsPage() {
       questions: finalQuestions
     }
 
+    setIsCreating(true)
     try {
       const res = await api.post('/api/mock-tests', payload)
       toast.success('Contest created and listed! 🏆')
@@ -223,6 +232,8 @@ export default function MockTestsPage() {
       setManualQuestions([{ text: '', options: ['', '', '', ''], correctOption: 0, explanation: '', marks: 10 }])
     } catch {
       toast.error('Failed to create contest')
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -792,9 +803,10 @@ export default function MockTestsPage() {
               <button
                 className="btn btn-primary"
                 onClick={handleCreateContest}
+                disabled={isCreating}
                 id="btn-submit-contest"
               >
-                Publish Contest 🚀
+                {isCreating ? 'Publishing...' : 'Publish Contest 🚀'}
               </button>
             </div>
           </div>

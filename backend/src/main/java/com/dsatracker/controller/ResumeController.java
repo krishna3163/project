@@ -1,67 +1,52 @@
 package com.dsatracker.controller;
 
 import com.dsatracker.model.Resume;
-import com.dsatracker.model.User;
-import com.dsatracker.repository.ResumeRepository;
-import com.dsatracker.service.ResumeService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import com.dsatracker.model.ResumeUploadResponse;
+import com.dsatracker.service.ResumeAnalyzerService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
+import java.util.List;
 
 @RestController
-@RequestMapping("/api/resumes")
-@RequiredArgsConstructor
+@RequestMapping("/api/resume")
+@CrossOrigin(origins = "*") // Changed to * for dev
 public class ResumeController {
-
-    private final ResumeService resumeService;
-    private final ResumeRepository resumeRepository;
-
-    /**
-     * Save resume metadata after frontend uploads to Cloudinary.
-     * Analysis runs async in background via @Async.
-     *
-     * TODO(security): Validate that the fileUrl is a valid Cloudinary URL before storing.
-     * TODO(security): Scan uploaded file for malware via antivirus API.
-     */
-    @PostMapping
-    public ResponseEntity<Resume> create(
-            @RequestBody ResumeRequest req,
-            @AuthenticationPrincipal User user) {
-        Resume resume = new Resume();
-        resume.setUserId(user.getId());
-        resume.setFileName(req.fileName());
-        resume.setFileUrl(req.fileUrl());
-        resume.setUploadedAt(Instant.now());
-        Resume saved = resumeRepository.save(resume);
-        // Trigger async analysis (non-blocking)
-        // Note: actual text extraction requires the file stream — for Cloudinary,
-        // download and pass stream in a real implementation.
-        return ResponseEntity.ok(saved);
+    
+    @Autowired
+    private ResumeAnalyzerService resumeService;
+    
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadResume(
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader("userId") String userId) {
+        
+        if(file.getContentType() == null || !file.getContentType().equals("application/pdf")) {
+            return ResponseEntity.badRequest().body("Only PDF files are allowed");
+        }
+        
+        if(file.getSize() > 5 * 1024 * 1024) {
+            return ResponseEntity.badRequest().body("File size must be less than 5MB");
+        }
+        
+        ResumeUploadResponse response = resumeService.uploadResume(file, userId);
+        return ResponseEntity.ok(response);
     }
-
-    @GetMapping
-    public ResponseEntity<Page<Resume>> getMyResumes(
-            @RequestParam(defaultValue = "0") int page,
-            @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(resumeRepository.findByUserId(user.getId(), PageRequest.of(page, 10)));
+    
+    @GetMapping("/result/{resumeId}")
+    public ResponseEntity<?> getAnalysisResult(
+            @PathVariable String resumeId,
+            @RequestHeader("userId") String userId) {
+        
+        Resume resume = resumeService.getAnalysisResult(resumeId, userId);
+        return ResponseEntity.ok(resume);
     }
-
-    @GetMapping("/latest")
-    public ResponseEntity<Resume> getLatest(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(resumeService.getLatest(user.getId()));
+    
+    @GetMapping("/history")
+    public ResponseEntity<?> getResumeHistory(@RequestHeader("userId") String userId) {
+        List<Resume> history = resumeService.getUserResumeHistory(userId);
+        return ResponseEntity.ok(history);
     }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Resume> getById(
-            @PathVariable String id,
-            @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(resumeService.getById(id, user.getId()));
-    }
-
-    public record ResumeRequest(String fileName, String fileUrl) {}
 }

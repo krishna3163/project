@@ -39,4 +39,13 @@ public class NotificationService {
             notificationRepository.save(n);
         });
     }
+
+    public Notification createNotification(String userId, String type, String message) {
+        Notification notif = new Notification();
+        notif.setUserId(userId);
+        notif.setType(type);
+        notif.setMessage(message);
+        notif.setCreatedAt(java.time.Instant.now());
+        return notificationRepository.save(notif);
+    }
 }

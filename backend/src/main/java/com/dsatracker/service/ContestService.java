@@ -72,28 +72,45 @@ public class ContestService {
 
         if (upcoming.isEmpty()) return;
 
-        List<User> users = userRepository.findAll();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a z")
                 .withZone(ZoneId.of("Asia/Kolkata"));
 
-        for (Contest contest : upcoming) {
-            String startTime = fmt.format(contest.getStartTime());
-            for (User user : users) {
-                emailService.sendContestReminder(user.getEmail(), contest.getName(),
-                        contest.getPlatform(), startTime, contest.getUrl());
-                // In-app notification
-                Notification notif = new Notification();
-                notif.setUserId(user.getId());
-                notif.setType("REMINDER");
-                notif.setMessage("⏰ " + contest.getName() + " starts in 1 hour!");
-                notif.setActionUrl(contest.getUrl());
-                notif.setCreatedAt(Instant.now());
-                notificationRepository.save(notif);
+        int totalUsersNotified = 0;
+        int pageSize = 100;
+        int pageNumber = 0;
+        Page<User> userPage;
+
+        do {
+            userPage = userRepository.findAll(org.springframework.data.domain.PageRequest.of(pageNumber, pageSize));
+            List<User> users = userPage.getContent();
+            for (Contest contest : upcoming) {
+                String startTime = fmt.format(contest.getStartTime());
+                for (User user : users) {
+                    // Honor preferences
+                    if (!user.isContestRemindersEnabled()) {
+                        continue;
+                    }
+                    emailService.sendContestReminder(user.getEmail(), contest.getName(),
+                            contest.getPlatform(), startTime, contest.getUrl());
+                    // In-app notification
+                    Notification notif = new Notification();
+                    notif.setUserId(user.getId());
+                    notif.setType("REMINDER");
+                    notif.setMessage("⏰ " + contest.getName() + " starts in 1 hour!");
+                    notif.setActionUrl(contest.getUrl());
+                    notif.setCreatedAt(Instant.now());
+                    notificationRepository.save(notif);
+                    totalUsersNotified++;
+                }
             }
+            pageNumber++;
+        } while (userPage.hasNext());
+
+        for (Contest contest : upcoming) {
             contest.setNotified(true);
             contestRepository.save(contest);
         }
-        log.info("Sent reminders for {} contests to {} users", upcoming.size(), users.size());
+        log.info("Sent reminders for {} contests to {} users", upcoming.size(), totalUsersNotified);
     }
 
     private void fetchHackerRankContests() {

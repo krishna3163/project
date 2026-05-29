@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -167,6 +168,36 @@ public class ResumeService {
         fb.append("- Include metrics (e.g., *Improved latency by 40%*).\n");
         
         return fb.toString();
+    }
+
+    @Async
+    public void analyzeFromUrlAsync(String resumeId, String fileUrl) {
+        resumeRepository.findById(resumeId).ifPresent(resume -> {
+            try {
+                resume.setStatus("processing");
+                resumeRepository.save(resume);
+
+                java.net.URL url = new java.net.URL(fileUrl);
+                try (java.io.InputStream in = url.openStream()) {
+                    String text = tika.parseToString(in);
+                    resume.setParsedText(text);
+                    ResumeAnalysisResult result = analyze(text);
+                    resume.setAnalysisScore(result.score());
+                    resume.setSuggestions(result.suggestions());
+                    resume.setMatchedKeywords(result.matchedKeywords());
+                    resume.setAiFeedback(result.aiFeedback());
+                    resume.setAtsScore(result.score());
+                    resume.setStatus("completed");
+                    resume.setProcessedAt(Instant.now());
+                    resumeRepository.save(resume);
+                    log.info("Resume URL analysis complete for resumeId: {}", resumeId);
+                }
+            } catch (Exception e) {
+                log.error("Resume URL analysis failed for resumeId: {} error: {}", resumeId, e.getMessage());
+                resume.setStatus("failed");
+                resumeRepository.save(resume);
+            }
+        });
     }
 
     private record ResumeAnalysisResult(int score, List<String> suggestions, List<String> matchedKeywords, String aiFeedback) {}
