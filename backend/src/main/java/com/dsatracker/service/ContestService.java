@@ -89,7 +89,7 @@ public class ContestService {
                         continue;
                     }
                     emailService.sendContestReminder(user.getEmail(), contest.getName(),
-                            contest.getPlatform(), startTime, contest.getUrl());
+                            contest.getPlatform(), startTime, contest.getUrl(), contest.getStartTime(), contest.getEndTime());
                     // In-app notification
                     Notification notif = new Notification();
                     notif.setUserId(user.getId());

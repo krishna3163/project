@@ -37,7 +37,7 @@ public class EmailService {
         String subject = "🔐 Your DSA Tracker OTP";
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
-                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        background: #000000; padding:40px;
                         border-radius:16px; color:#f1f5f9;">
               <h1 style="color:#6366f1; margin-bottom:8px;">DSA Tracker</h1>
               <h2 style="margin-top:0;">Your One-Time Password</h2>
@@ -60,7 +60,7 @@ public class EmailService {
         String subject = "🎉 Congratulations! – " + achievement;
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
-                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        background: #000000; padding:40px;
                         border-radius:16px; color:#f1f5f9;">
               <h1 style="color:#f59e0b;">🏆 Achievement Unlocked!</h1>
               <h2>Hey %s!</h2>
@@ -82,11 +82,15 @@ public class EmailService {
     @Async
     @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 2000, multiplier = 2))
     public void sendContestReminder(String to, String contestName, String platform,
-                                    String startTime, String contestUrl) {
+                                    String startTime, String contestUrl, java.time.Instant startInstant, java.time.Instant endInstant) {
         String subject = "⏰ Contest Reminder: " + contestName;
+        
+        String startIso = startInstant != null ? java.time.format.DateTimeFormatter.ISO_INSTANT.format(startInstant) : "";
+        String endIso = endInstant != null ? java.time.format.DateTimeFormatter.ISO_INSTANT.format(endInstant) : "";
+
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
-                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        background: #000000; padding:40px;
                         border-radius:16px; color:#f1f5f9;">
               <h1 style="color:#22d3ee;">⏰ Contest Starts in 1 Hour!</h1>
               <div style="background:#164e63; border-radius:12px; padding:24px; margin:24px 0;
@@ -101,7 +105,25 @@ public class EmailService {
               <hr style="border-color:#334155; margin:24px 0;">
               <p style="color:#64748b; font-size:12px;">© 2025 DSA Tracker Platform</p>
             </div>
-            """.formatted(contestName, platform, startTime, contestUrl);
+
+            <!-- Google Calendar Add to Calendar Markup -->
+            <script type="application/ld+json">
+            {
+              "@context": "http://schema.org",
+              "@type": "Event",
+              "name": "%s",
+              "startDate": "%s",
+              "endDate": "%s",
+              "url": "%s",
+              "description": "Reminder for the upcoming coding contest '%s' on %s.",
+              "performer": {
+                "@type": "Organization",
+                "name": "PrepNest"
+              }
+            }
+            </script>
+            """.formatted(contestName, platform, startTime, contestUrl,
+                          contestName, startIso, endIso, contestUrl, contestName, platform);
         sendHtml(to, subject, html);
     }
 
@@ -119,7 +141,7 @@ public class EmailService {
         String calUrl = generateGoogleCalendarUrl(testTitle, "Practice session on mock contest " + testTitle + ". Score: " + score + "/" + totalUsers + ". Let's keep refining our skills!");
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
-                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        background: #000000; padding:40px;
                         border-radius:16px; color:#f1f5f9;">
               <h1 style="color:#6366f1;">📊 Test Results</h1>
               <h2 style="color:#f1f5f9;">%s</h2>
@@ -168,7 +190,7 @@ public class EmailService {
         String calUrl = generateGoogleCalendarUrl(testTitle, "Detailed analysis practice on PrepNest: " + testTitle + ". Solved score: " + score + ". Let's make it to the top leaderboard next!");
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
-                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        background: #000000; padding:40px;
                         border-radius:16px; color:#f1f5f9;">
               <h1 style="color:#6366f1;">🎯 PrepNest Test Report</h1>
               <h2 style="color:#f1f5f9;">Congratulations, %s! 🎉</h2>
@@ -229,7 +251,7 @@ public class EmailService {
         String subject = "🚀 Welcome to PrepNest! Let's Master DSA Together!";
         String html = """
             <div style="font-family: Inter, Arial, sans-serif; max-width:600px; margin:auto;
-                        background: linear-gradient(135deg, #0f172a, #1e293b); padding:40px;
+                        background: #000000; padding:40px;
                         border-radius:16px; color:#f1f5f9;">
               <h1 style="color:#6366f1;">🚀 Welcome to PrepNest, %s!</h1>
               <h2>Your Ultimate DSA & Mock Test Partner</h2>

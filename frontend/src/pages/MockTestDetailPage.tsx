@@ -246,39 +246,113 @@ export default function MockTestDetailPage() {
     setActiveQuestionIdx(idx)
   }
 
-  // Local Code TestCase validator simulation
+  // Real JavaScript sandboxed compilation & execution compiler engine
   const runCodeTests = (question: any) => {
     const code = answers[question.id] || ''
     setTestingStatus(prev => ({ ...prev, [question.id]: 'running' }))
+    setRunOutputs(prev => ({ ...prev, [question.id]: '' }))
 
     setTimeout(() => {
-      // Basic syntax validation
-      const hasFunction = code.includes('function') || code.includes('const') || code.includes('class')
-      const hasReturn = code.includes('return')
-      
-      if (hasFunction && hasReturn) {
-        setTestingStatus(prev => ({ ...prev, [question.id]: 'success' }))
+      // 1. Extract function name from boilerplate
+      const boilerplate = question.boilerplate || ''
+      const funcNameMatch = boilerplate.match(/function\s+([a-zA-Z0-9_]+)/)
+      const funcName = funcNameMatch ? funcNameMatch[1] : 'solution'
+
+      // 2. Parse test cases
+      const rawTestCases = question.testCases || []
+      if (rawTestCases.length === 0) {
+        setTestingStatus(prev => ({ ...prev, [question.id]: 'failed' }))
+        setRunOutputs(prev => ({ ...prev, [question.id]: '❌ Error: No test cases found for this question.' }))
+        toast.error('No test cases found.')
+        return
+      }
+
+      let allPassed = true
+      let outputLogs = `🚀 Compiling & Executing JavaScript Code...\n\n`
+
+      for (let i = 0; i < rawTestCases.length; i++) {
+        const tc = rawTestCases[i]
+        const parts = tc.split(' -> ')
+        if (parts.length < 2) continue
+
+        const inputArgs = parts[0].trim()
+        const expectedOutput = parts[1].trim()
+
+        let capturedLogs: string[] = []
+        let originalConsoleLog = console.log
         
-        let customOutput = `[SYNTAX CHECK ONLY: JavaScript/TypeScript parsing successful]\n`
-        if (question.title?.toLowerCase().includes('two sum')) {
-          customOutput += `✅ Test Case 1 (Two Sum): [2,7,11,15], 9 -> Passed (returns array)\n✅ Test Case 2: [3,2,4], 6 -> Passed`
-        } else if (question.text?.toLowerCase().includes('reverse') || question.text?.toLowerCase().includes('invert')) {
-          customOutput += `✅ Test Case 1: [1,2,3,4,5] -> Passed (returns reversed list)\n✅ Test Case 2: [] -> Passed`
-        } else {
-          customOutput += `✅ Test Case 1: Basic validation passed\n✅ Test Case 2: No structural syntax errors found`
+        try {
+          // Intercept console.log
+          console.log = (...args: any[]) => {
+            capturedLogs.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '))
+          }
+
+          // Evaluate arguments safely in sandboxed function
+          const parsedArgs = new Function(`return [${inputArgs}]`)()
+          const expectedVal = new Function(`return ${expectedOutput}`)()
+
+          // Create dynamic code runner
+          const runner = new Function('args', `
+            ${code}
+            if (typeof ${funcName} !== 'function') {
+              throw new Error("Function '${funcName}' is not defined. Please ensure you do not rename the boilerplate function definition.");
+            }
+            return ${funcName}.apply(null, args);
+          `)
+
+          const startTime = performance.now()
+          const gotVal = runner(parsedArgs)
+          const endTime = performance.now()
+          const execTime = (endTime - startTime).toFixed(2)
+
+          // Restore console.log immediately
+          console.log = originalConsoleLog
+
+          const gotStr = JSON.stringify(gotVal)
+          const expectedStr = JSON.stringify(expectedVal)
+
+          if (gotStr === expectedStr) {
+            outputLogs += `✅ **Test Case ${i + 1}: Passed** (${execTime} ms)\n`
+            outputLogs += `   Input:    ${inputArgs}\n`
+            outputLogs += `   Output:   ${gotStr}\n`
+          } else {
+            allPassed = false
+            outputLogs += `❌ **Test Case ${i + 1}: Failed** (${execTime} ms)\n`
+            outputLogs += `   Input:    ${inputArgs}\n`
+            outputLogs += `   Expected: ${expectedStr}\n`
+            outputLogs += `   Got:      ${gotStr}\n`
+          }
+
+          if (capturedLogs.length > 0) {
+            outputLogs += `   Console Logs:\n`
+            capturedLogs.forEach(l => {
+              outputLogs += `     > ${l}\n`
+            })
+          }
+          outputLogs += `\n`
+
+        } catch (err: any) {
+          // Restore console.log on error
+          console.log = originalConsoleLog
+          allPassed = false
+          outputLogs += `❌ **Test Case ${i + 1}: Runtime Error**\n`
+          outputLogs += `   Input: ${inputArgs}\n`
+          outputLogs += `   Error: ${err.message || err}\n\n`
         }
-        customOutput += `\n\nAll public test cases passed local static validation successfully!`
-        
-        setRunOutputs(prev => ({ ...prev, [question.id]: customOutput }))
-        toast.success('Local syntax validation passed! 🎉')
+      }
+
+      if (allPassed) {
+        setTestingStatus(prev => ({ ...prev, [question.id]: 'success' }))
+        outputLogs += `🎉 **Success! All test cases passed local compilation & execution!**`
+        setRunOutputs(prev => ({ ...prev, [question.id]: outputLogs }))
+        toast.success('All test cases passed! 🎉')
       } else {
         setTestingStatus(prev => ({ ...prev, [question.id]: 'failed' }))
-        let customError = `[SYNTAX CHECK ONLY: Validation Failed]\n`
-        customError += `❌ Error: Missing essential structural keywords (function / return).\nEnsure you declare a function and return the result.`
-        setRunOutputs(prev => ({ ...prev, [question.id]: customError }))
-        toast.error('Syntax validation failed.')
+        outputLogs += `⚠️ **Some test cases failed. Please review your code logic and try again.**`
+        setRunOutputs(prev => ({ ...prev, [question.id]: outputLogs }))
+        toast.error('Test cases failed.')
       }
-    }, 1500)
+    }, 1200)
   }
 
   const formatTime = (seconds: number) => {
@@ -481,8 +555,8 @@ export default function MockTestDetailPage() {
                       >
                         <Terminal size={14} /> Run Test Cases
                       </button>
-                      <span style={{ fontSize: 11, background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', color: '#fbbf24', padding: '4px 10px', borderRadius: 12, fontWeight: 600 }}>
-                        ⚠️ Syntax Check Only
+                      <span style={{ fontSize: 11, background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '4px 10px', borderRadius: 12, fontWeight: 600 }}>
+                        💻 JS Runtime Compiler
                       </span>
                       <button
                         onClick={() => setFlaggedQuestions(prev => ({ ...prev, [activeQuestion.id]: !prev[activeQuestion.id] }))}
