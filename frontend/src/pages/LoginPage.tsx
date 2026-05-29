@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { Loader2, Chrome, Github, Apple, MoreHorizontal } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const { sendOtp, verifyOtp, loading } = useAuth()
@@ -9,11 +9,29 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [otpVal, setOtpVal] = useState('')
 
+  // Captcha State
+  const [captchaChecked, setCaptchaChecked] = useState(false)
+  const [captchaLoading, setCaptchaLoading] = useState(false)
+
   const params = new URLSearchParams(window.location.search)
   const isConcurrent = params.get('concurrent') === 'true'
 
+  const handleCaptchaClick = () => {
+    if (captchaChecked || captchaLoading) return
+    setCaptchaLoading(true)
+    setTimeout(() => {
+      setCaptchaLoading(false)
+      setCaptchaChecked(true)
+      toast.success('Captcha verified! 🤖')
+    }, 850)
+  }
+
   const handleSendOtp = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!captchaChecked) {
+      toast.error('Please verify that you are not a robot first!')
+      return
+    }
     if (!email.trim()) return
     try {
       await sendOtp(email)
@@ -22,7 +40,7 @@ export default function LoginPage() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to send OTP')
     }
-  }, [email, sendOtp])
+  }, [email, sendOtp, captchaChecked])
 
   const handleVerifyOtp = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -143,41 +161,83 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Cloudflare Captcha Simulator Card */}
+          {/* reCAPTCHA Simulator Card (I am not a robot) */}
           <div style={{
-            background: '#ffffff',
-            border: '1px solid #d1d5db',
-            borderRadius: 4,
-            padding: '10px 16px',
+            background: '#f9f9f9',
+            border: '1px solid #d3d3d3',
+            borderRadius: 3,
+            padding: '10px 14px',
             margin: '18px 0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             width: '100%',
-            height: 56,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            height: 74,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: '#10b981',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                fontWeight: 'bold',
-                fontSize: 14
-              }}>✓</div>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#374151' }}>Success!</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 8, fontWeight: 800, color: '#f97316', letterSpacing: '0.2px' }}>CLOUDFLARE</span>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div
+                onClick={handleCaptchaClick}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 2,
+                  border: captchaChecked ? 'none' : '2px solid #c1c1c1',
+                  background: captchaChecked ? 'transparent' : '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: captchaChecked || captchaLoading ? 'default' : 'pointer',
+                  boxShadow: captchaChecked ? 'none' : 'inset 0 1px 1px rgba(0,0,0,0.1)',
+                  position: 'relative'
+                }}
+              >
+                {captchaLoading ? (
+                  <div className="spinner" style={{
+                    width: 18,
+                    height: 18,
+                    borderWidth: 2.5,
+                    borderStyle: 'solid',
+                    borderColor: '#4a90e2 #4a90e2 transparent transparent',
+                    borderRadius: '50%'
+                  }} />
+                ) : captchaChecked ? (
+                  <div style={{
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#009a44',
+                    fontSize: 26,
+                    fontWeight: 'bold',
+                    animation: 'popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                  }}>✓</div>
+                ) : null}
               </div>
-              <div style={{ fontSize: 9, color: '#6b7280', marginTop: 2 }}>
-                <a href="#" style={{ color: '#6b7280', textDecoration: 'underline' }}>Privacy</a> • <a href="#" style={{ color: '#6b7280', textDecoration: 'underline' }}>Help</a>
+              <span style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: '#2d2d2d',
+                marginLeft: 14,
+                fontFamily: 'Roboto, Arial, sans-serif',
+                cursor: captchaChecked || captchaLoading ? 'default' : 'pointer',
+                userSelect: 'none'
+              }} onClick={handleCaptchaClick}>
+                I'm not a robot
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <img
+                src="https://www.gstatic.com/recaptcha/api2/logo_48.png"
+                alt="reCAPTCHA logo"
+                style={{ width: 28, height: 28, opacity: 0.9, objectFit: 'contain' }}
+              />
+              <span style={{ fontSize: 8, color: '#9b9b9b', marginTop: 4, fontWeight: 'bold', fontFamily: 'sans-serif' }}>reCAPTCHA</span>
+              <div style={{ fontSize: 7, color: '#9b9b9b', marginTop: 1, fontFamily: 'sans-serif' }}>
+                <a href="#" style={{ color: '#9b9b9b', textDecoration: 'none' }}>Privacy</a> • <a href="#" style={{ color: '#9b9b9b', textDecoration: 'none' }}>Terms</a>
               </div>
             </div>
           </div>
@@ -225,47 +285,15 @@ export default function LoginPage() {
           <span style={{ cursor: 'pointer' }} onClick={() => toast('OTP flow does not require traditional passwords.')}>Forgot Password?</span>
           <span style={{ cursor: 'pointer', color: '#007aff', fontWeight: 500 }} onClick={() => { setStep('email'); setOtpVal('') }}>Sign Up</span>
         </div>
-
-        {/* Social Sign In */}
-        <div style={{ width: '100%', textAlign: 'center', marginTop: 32 }}>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16, position: 'relative' }}>
-            <span style={{ background: '#ffffff', padding: '0 8px', position: 'relative', zIndex: 1 }}>or you can sign in with</span>
-            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: '#e5e7eb', zIndex: 0 }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 14 }}>
-            <button style={socialBtnStyle} onClick={() => toast('Google auth simulation')}>
-              <Chrome size={18} color="#8c8c8c" />
-            </button>
-            <button style={socialBtnStyle} onClick={() => toast('GitHub auth simulation')}>
-              <Github size={18} color="#8c8c8c" />
-            </button>
-            <button style={socialBtnStyle} onClick={() => toast('Apple auth simulation')}>
-              <Apple size={18} color="#8c8c8c" />
-            </button>
-            <button style={socialBtnStyle} onClick={() => toast('More options')}>
-              <MoreHorizontal size={18} color="#8c8c8c" />
-            </button>
-          </div>
-        </div>
       </div>
       <style>{`
         .spinner { animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes popIn {
+          0% { transform: scale(0); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
       `}</style>
     </div>
   )
-}
-
-const socialBtnStyle: React.CSSProperties = {
-  width: 38,
-  height: 38,
-  borderRadius: '50%',
-  border: 'none',
-  background: '#f2f3f5',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-  transition: 'background 0.2s',
-  outline: 'none'
 }
